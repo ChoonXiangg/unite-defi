@@ -7,6 +7,9 @@ export default function Wallet() {
   const [loading, setLoading] = useState(false);
   const [password, setPassword] = useState('');
   const [mnemonic, setMnemonic] = useState('');
+  const [editingWallet, setEditingWallet] = useState(null);
+  const [editUsername, setEditUsername] = useState('');
+  const [editLabel, setEditLabel] = useState('');
 
   useEffect(() => {
     loadWallets();
@@ -30,6 +33,8 @@ export default function Wallet() {
       return;
     }
 
+    const username = prompt('Enter a username for this wallet (optional):') || '';
+
     setLoading(true);
     try {
       const response = await fetch('/api/wallet/create', {
@@ -40,6 +45,11 @@ export default function Wallet() {
 
       const data = await response.json();
       if (data.success) {
+        // Update wallet with username if provided
+        if (username) {
+          await updateWalletMetadata(data.walletId, { username });
+        }
+        
         alert(`Wallet created! Save this mnemonic: ${data.mnemonic}`);
         setPassword('');
         loadWallets();
@@ -164,6 +174,85 @@ export default function Wallet() {
     setLoading(false);
   };
 
+  const updateWalletMetadata = async (walletId, metadata) => {
+    try {
+      const response = await fetch('/api/wallet/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletId, metadata })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        loadWallets();
+        return true;
+      } else {
+        alert('Failed to update wallet: ' + data.error);
+        return false;
+      }
+    } catch (error) {
+      alert('Error updating wallet: ' + error.message);
+      return false;
+    }
+  };
+
+  const deleteWallet = async (walletId) => {
+    if (!confirm('Are you sure you want to delete this wallet? This action cannot be undone.')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/wallet/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletId })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert('Wallet deleted successfully');
+        loadWallets();
+        if (activeWallet && activeWallet.walletId === walletId) {
+          setActiveWallet(null);
+          setPortfolio(null);
+        }
+      } else {
+        alert('Failed to delete wallet: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error deleting wallet: ' + error.message);
+    }
+    setLoading(false);
+  };
+
+  const startEditWallet = (wallet) => {
+    setEditingWallet(wallet);
+    setEditUsername(wallet.metadata.username || '');
+    setEditLabel(wallet.metadata.label || '');
+  };
+
+  const saveWalletEdit = async () => {
+    if (!editingWallet) return;
+
+    const success = await updateWalletMetadata(editingWallet.id, {
+      username: editUsername,
+      label: editLabel
+    });
+
+    if (success) {
+      setEditingWallet(null);
+      setEditUsername('');
+      setEditLabel('');
+    }
+  };
+
+  const cancelWalletEdit = () => {
+    setEditingWallet(null);
+    setEditUsername('');
+    setEditLabel('');
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1>Unite DeFi Wallet</h1>
@@ -209,10 +298,67 @@ export default function Wallet() {
           <p>No wallets found</p>
         ) : (
           wallets.map(wallet => (
-            <div key={wallet.id} style={{ margin: '10px 0', padding: '10px', border: '1px solid #ccc' }}>
-              <strong>ID:</strong> {wallet.id}<br />
-              <strong>Created:</strong> {new Date(wallet.createdAt).toLocaleString()}<br />
-              <button onClick={() => unlockWallet(wallet.id)}>Unlock</button>
+            <div key={wallet.id} style={{ 
+              margin: '10px 0', 
+              padding: '15px', 
+              border: '1px solid #ccc', 
+              borderRadius: '5px',
+              backgroundColor: activeWallet?.walletId === wallet.id ? '#f0f8ff' : 'white'
+            }}>
+              {editingWallet?.id === wallet.id ? (
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Username"
+                    value={editUsername}
+                    onChange={(e) => setEditUsername(e.target.value)}
+                    style={{ marginRight: '10px', padding: '5px' }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Label"
+                    value={editLabel}
+                    onChange={(e) => setEditLabel(e.target.value)}
+                    style={{ marginRight: '10px', padding: '5px' }}
+                  />
+                  <button onClick={saveWalletEdit} style={{ marginRight: '5px' }}>Save</button>
+                  <button onClick={cancelWalletEdit}>Cancel</button>
+                </div>
+              ) : (
+                <div>
+                  {wallet.metadata.username && (
+                    <div><strong>Username:</strong> {wallet.metadata.username}</div>
+                  )}
+                  {wallet.metadata.label && (
+                    <div><strong>Label:</strong> {wallet.metadata.label}</div>
+                  )}
+                  <div><strong>ID:</strong> {wallet.id}</div>
+                  <div><strong>Created:</strong> {new Date(wallet.createdAt).toLocaleString()}</div>
+                  {wallet.updatedAt !== wallet.createdAt && (
+                    <div><strong>Updated:</strong> {new Date(wallet.updatedAt).toLocaleString()}</div>
+                  )}
+                  <div style={{ marginTop: '10px' }}>
+                    <button 
+                      onClick={() => unlockWallet(wallet.id)}
+                      style={{ marginRight: '10px' }}
+                    >
+                      Unlock
+                    </button>
+                    <button 
+                      onClick={() => startEditWallet(wallet)}
+                      style={{ marginRight: '10px' }}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      onClick={() => deleteWallet(wallet.id)}
+                      style={{ backgroundColor: '#ff4444', color: 'white' }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}
