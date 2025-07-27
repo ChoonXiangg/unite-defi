@@ -19,6 +19,23 @@ export default async function handler(req, res) {
     const walletManager = new WalletManager();
     const wallet = await walletManager.importWallet(mnemonic);
     
+    // Check if wallet already exists
+    const existingWallet = walletManager.checkWalletExists(
+      wallet.evm.address, 
+      wallet.tezos.address
+    );
+    
+    if (existingWallet) {
+      return res.status(409).json({ 
+        error: `Wallet already exists${existingWallet.metadata.username ? ` (${existingWallet.metadata.username})` : ''}`,
+        existingWallet: {
+          id: existingWallet.id,
+          username: existingWallet.metadata.username,
+          createdAt: existingWallet.createdAt
+        }
+      });
+    }
+    
     // Generate wallet ID from timestamp and random string
     const walletId = `wallet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     

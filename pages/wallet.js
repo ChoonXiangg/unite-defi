@@ -83,7 +83,12 @@ export default function Wallet() {
         setMnemonic('');
         loadWallets();
       } else {
-        alert('Failed to import wallet: ' + data.error);
+        if (response.status === 409) {
+          // Wallet already exists
+          alert(`Cannot import wallet: ${data.error}\n\nExisting wallet created: ${new Date(data.existingWallet.createdAt).toLocaleString()}`);
+        } else {
+          alert('Failed to import wallet: ' + data.error);
+        }
       }
     } catch (error) {
       alert('Error importing wallet: ' + error.message);
