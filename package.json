@@ -9,15 +9,22 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@taquito/signer": "^22.0.0",
+    "@taquito/taquito": "^22.0.0",
+    "@taquito/utils": "^22.0.0",
+    "bip39": "^3.1.0",
+    "crypto-js": "^4.2.0",
+    "ethers": "^6.15.0",
+    "next": "15.4.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.4.4"
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "15.4.4",
-    "@eslint/eslintrc": "^3"
+    "tailwindcss": "^4"
   }
 }
