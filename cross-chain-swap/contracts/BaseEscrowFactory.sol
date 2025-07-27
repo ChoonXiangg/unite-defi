@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.23;
+pragma solidity ^0.8.23;
 
 import { Clones } from "openzeppelin-contracts/contracts/proxy/Clones.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -10,7 +10,6 @@ import { SafeERC20 } from "solidity-utils/contracts/libraries/SafeERC20.sol";
 
 import { IOrderMixin } from "limit-order-protocol/contracts/interfaces/IOrderMixin.sol";
 import { MakerTraitsLib } from "limit-order-protocol/contracts/libraries/MakerTraitsLib.sol";
-import { ResolverValidationExtension } from "limit-order-settlement/contracts/extensions/ResolverValidationExtension.sol";
 
 import { ImmutablesLib } from "./libraries/ImmutablesLib.sol";
 import { Timelocks, TimelocksLib } from "./libraries/TimelocksLib.sol";
@@ -19,6 +18,7 @@ import { IEscrowFactory } from "./interfaces/IEscrowFactory.sol";
 import { IBaseEscrow } from "./interfaces/IBaseEscrow.sol";
 import { SRC_IMMUTABLES_LENGTH } from "./EscrowFactoryContext.sol";
 import { MerkleStorageInvalidator } from "./MerkleStorageInvalidator.sol";
+import { IFeeBank } from "limit-order-settlement/contracts/interfaces/IFeeBank.sol";
 
 /**
  * @title Abstract contract for escrow factory
@@ -26,7 +26,7 @@ import { MerkleStorageInvalidator } from "./MerkleStorageInvalidator.sol";
  * @dev Immutable variables must be set in the constructor of the derived contracts.
  * @custom:security-contact security@1inch.io
  */
-abstract contract BaseEscrowFactory is IEscrowFactory, ResolverValidationExtension, MerkleStorageInvalidator {
+abstract contract BaseEscrowFactory is IEscrowFactory, MerkleStorageInvalidator {
     using AddressLib for Address;
     using Clones for address;
     using ImmutablesLib for IBaseEscrow.Immutables;
@@ -39,6 +39,21 @@ abstract contract BaseEscrowFactory is IEscrowFactory, ResolverValidationExtensi
     address public immutable ESCROW_DST_IMPLEMENTATION;
     bytes32 internal immutable _PROXY_SRC_BYTECODE_HASH;
     bytes32 internal immutable _PROXY_DST_BYTECODE_HASH;
+    IFeeBank public immutable feeBank;
+    IERC20 public immutable feeToken;
+    IERC20 public immutable accessToken;
+    address public immutable owner;
+    uint32 public immutable rescueDelaySrc;
+    uint32 public immutable rescueDelayDst;
+
+    constructor(IERC20 _feeToken, IERC20 _accessToken, IFeeBank _feeBank, address _owner, uint32 _rescueDelaySrc, uint32 _rescueDelayDst) {
+        feeToken = _feeToken;
+        accessToken = _accessToken;
+        feeBank = _feeBank;
+        owner = _owner;
+        rescueDelaySrc = _rescueDelaySrc;
+        rescueDelayDst = _rescueDelayDst;
+    }
 
     /**
      * @notice Creates a new escrow contract for maker on the source chain.
@@ -61,11 +76,11 @@ abstract contract BaseEscrowFactory is IEscrowFactory, ResolverValidationExtensi
         uint256 takingAmount,
         uint256 remainingMakingAmount,
         bytes calldata extraData
-    ) internal override(ResolverValidationExtension) {
+    ) internal {
         uint256 superArgsLength = extraData.length - SRC_IMMUTABLES_LENGTH;
-        super._postInteraction(
-            order, extension, orderHash, taker, makingAmount, takingAmount, remainingMakingAmount, extraData[:superArgsLength]
-        );
+        // super._postInteraction(
+        //     order, extension, orderHash, taker, makingAmount, takingAmount, remainingMakingAmount, extraData[:superArgsLength]
+        // );
 
         ExtraDataArgs calldata extraDataArgs;
         assembly ("memory-safe") {
@@ -115,6 +130,19 @@ abstract contract BaseEscrowFactory is IEscrowFactory, ResolverValidationExtensi
         }
     }
 
+    function postInteraction(
+        IOrderMixin.Order calldata order,
+        bytes calldata extension,
+        bytes32 orderHash,
+        address taker,
+        uint256 makingAmount,
+        uint256 takingAmount,
+        uint256 remainingMakingAmount,
+        bytes calldata extraData
+    ) public {
+        _postInteraction(order, extension, orderHash, taker, makingAmount, takingAmount, remainingMakingAmount, extraData);
+    }
+
     /**
      * @notice See {IEscrowFactory-createDstEscrow}.
      */
@@ -152,6 +180,14 @@ abstract contract BaseEscrowFactory is IEscrowFactory, ResolverValidationExtensi
      */
     function addressOfEscrowDst(IBaseEscrow.Immutables calldata immutables) external view virtual returns (address) {
         return Create2.computeAddress(immutables.hash(), _PROXY_DST_BYTECODE_HASH);
+    }
+
+    function FEE_BANK() public view returns (IFeeBank) {
+        return feeBank;
+    }
+
+    function isAccessTokenHolder(address account) public view returns (bool) {
+        return accessToken.balanceOf(account) > 0;
     }
 
     /**

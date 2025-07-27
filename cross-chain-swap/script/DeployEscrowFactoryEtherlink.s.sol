@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
 
 import { Script } from "forge-std/Script.sol";
 
@@ -21,7 +21,7 @@ contract DeployEscrowFactoryEtherlink is Script {
     ICreate3Deployer public constant CREATE3_DEPLOYER = ICreate3Deployer(0x65B3Db8bAeF0215A1F9B14c506D2a3078b2C84AE); // Create3 Deployer
     
     // Etherlink fee token (using USDC as it's commonly available on Etherlink)
-    address public constant FEE_TOKEN = 0xA0b86a33E6441b8C4C8C0C4C8C0C4C8C0C4C8C0C; // Placeholder - need actual USDC address on Etherlink
+    address public constant FEE_TOKEN = address(0); // TODO: set actual USDC address on Etherlink
 
     function run() external {
         address deployer = vm.envAddress("DEPLOYER_ADDRESS");

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
 
 import { Script } from "forge-std/Script.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { EscrowFactoryZkSync } from "contracts/zkSync/EscrowFactoryZkSync.sol";
+import { FeeBankMock } from "contracts/mocks/FeeBankMock.sol";
 
 // solhint-disable no-console
 import { console } from "forge-std/console.sol";
@@ -19,6 +20,7 @@ contract DeployEscrowFactoryZkSync is Script {
     function run() external {
         address deployer = vm.envAddress("DEPLOYER_ADDRESS");
         address feeBankOwner = deployer;
+        FeeBankMock feeBank = new FeeBankMock();
 
         vm.startBroadcast();
         EscrowFactoryZkSync escrowFactory = new EscrowFactoryZkSync(
@@ -27,7 +29,8 @@ contract DeployEscrowFactoryZkSync is Script {
             ACCESS_TOKEN,
             feeBankOwner,
             RESCUE_DELAY,
-            RESCUE_DELAY
+            RESCUE_DELAY,
+            feeBank
         );
         vm.stopBroadcast();
 

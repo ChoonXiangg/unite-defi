@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.23;
+pragma solidity ^0.8.23;
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { BaseExtension } from "limit-order-settlement/contracts/extensions/BaseExtension.sol";
-import { ResolverValidationExtension } from "limit-order-settlement/contracts/extensions/ResolverValidationExtension.sol";
+// import { BaseExtension } from "limit-order-settlement/contracts/extensions/BaseExtension.sol";
+// import { ResolverValidationExtension } from "limit-order-settlement/contracts/extensions/ResolverValidationExtension.sol";
+
+import { IFeeBank } from "limit-order-settlement/contracts/interfaces/IFeeBank.sol";
 
 import { ProxyHashLib } from "./libraries/ProxyHashLib.sol";
 
@@ -27,10 +29,10 @@ contract EscrowFactory is BaseEscrowFactory {
         IERC20 accessToken,
         address owner,
         uint32 rescueDelaySrc,
-        uint32 rescueDelayDst
+        uint32 rescueDelayDst,
+        IFeeBank feeBank
     )
-    BaseExtension(limitOrderProtocol)
-    ResolverValidationExtension(feeToken, accessToken, owner)
+    BaseEscrowFactory(feeToken, accessToken, feeBank, owner, rescueDelaySrc, rescueDelayDst)
     MerkleStorageInvalidator(limitOrderProtocol) {
         ESCROW_SRC_IMPLEMENTATION = address(new EscrowSrc(rescueDelaySrc, accessToken));
         ESCROW_DST_IMPLEMENTATION = address(new EscrowDst(rescueDelayDst, accessToken));

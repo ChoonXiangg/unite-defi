@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
 
 import { Test } from "forge-std/Test.sol";
 
@@ -9,13 +9,14 @@ import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol"
 import { EscrowFactory } from "contracts/EscrowFactory.sol";
 import { EscrowSrc } from "contracts/EscrowSrc.sol";
 import { EscrowDst } from "contracts/EscrowDst.sol";
-import { ERC20True } from "contracts/mocks/ERC20True.sol";
+import { ERC20MintableMock } from "contracts/mocks/ERC20MintableMock.sol";
+import { FeeBankMock } from "contracts/mocks/FeeBankMock.sol";
 
 contract EtherlinkEscrowFactoryTest is Test {
     EscrowFactory public factory;
-    ERC20True public feeToken;
-    ERC20True public accessToken;
-    ERC20True public testToken;
+    ERC20MintableMock public feeToken;
+    ERC20MintableMock public accessToken;
+    ERC20MintableMock public testToken;
     
     address public constant LOP = 0x111111125421cA6dc452d289314280a0f8842A65;
     address public constant CREATE3_DEPLOYER = 0x65B3Db8bAeF0215A1F9B14c506D2a3078b2C84AE;
@@ -32,20 +33,22 @@ contract EtherlinkEscrowFactoryTest is Test {
         taker = makeAddr("taker");
         
         // Deploy mock tokens
-        feeToken = new ERC20True("Fee Token", "FEE");
-        accessToken = new ERC20True("Access Token", "ACCESS");
-        testToken = new ERC20True("Test Token", "TEST");
+        feeToken = new ERC20MintableMock();
+        accessToken = new ERC20MintableMock();
+        testToken = new ERC20MintableMock();
         
         vm.startPrank(deployer);
         
         // Deploy EscrowFactory
+        FeeBankMock feeBank = new FeeBankMock();
         factory = new EscrowFactory(
             LOP,
             feeToken,
             accessToken,
             deployer,
             RESCUE_DELAY,
-            RESCUE_DELAY
+            RESCUE_DELAY,
+            feeBank
         );
         
         vm.stopPrank();

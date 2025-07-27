@@ -9,7 +9,7 @@
  * relying upon this code.  USE AT YOUR OWN RISK.
  *──────────────────────────────────────────────────────────────────────────────*/
 
-pragma solidity 0.8.23;
+pragma solidity ^0.8.23;
 
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 

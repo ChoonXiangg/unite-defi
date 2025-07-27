@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.23;
+pragma solidity ^0.8.23;
 
 import { IOrderMixin } from "limit-order-protocol/contracts/interfaces/IOrderMixin.sol";
 import { ExtensionLib } from "limit-order-protocol/contracts/libraries/ExtensionLib.sol";
@@ -33,8 +33,12 @@ contract MerkleStorageInvalidator is IMerkleStorageInvalidator, ITakerInteractio
         _;
     }
 
-    constructor(address limitOrderProtocol) {
-        _LIMIT_ORDER_PROTOCOL = limitOrderProtocol;
+    constructor(address _limitOrderProtocol) {
+        _LIMIT_ORDER_PROTOCOL = _limitOrderProtocol;
+    }
+
+    function limitOrderProtocol() public view returns (address) {
+        return _LIMIT_ORDER_PROTOCOL;
     }
 
     /**

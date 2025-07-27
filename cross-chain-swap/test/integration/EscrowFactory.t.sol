@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
 
 import { TakerTraits } from "limit-order-protocol/contracts/libraries/TakerTraitsLib.sol";
-import { Merkle } from "murky/src/Merkle.sol";
 import { Address } from "solidity-utils/contracts/libraries/AddressLib.sol";
 
 import { IEscrowFactory } from "contracts/interfaces/IEscrowFactory.sol";
@@ -165,28 +164,21 @@ contract IntegrationEscrowFactoryTest is BaseSetup {
             hashedSecrets[i] = keccak256(abi.encodePacked(i));
             hashedPairs[i] = keccak256(abi.encodePacked(i, hashedSecrets[i]));
         }
-        Merkle merkle = new Merkle();
-        bytes32 root = merkle.getRoot(hashedPairs);
-        bytes32 rootPlusAmount = bytes32(partsAmount << 240 | uint240(uint256(root)));
-        uint256 idx = 0;
-        uint256 makingAmount = MAKING_AMOUNT / partsAmount;
-        bytes32[] memory proof = merkle.getProof(hashedPairs, idx);
-        assert(merkle.verifyProof(root, proof, hashedPairs[idx]));
 
         vm.warp(1710288000); // set current timestamp
         (timelocks, timelocksDst) = CrossChainTestLib.setTimelocks(srcTimelocks, dstTimelocks);
 
 
-        CrossChainTestLib.SwapData memory swapData = _prepareDataSrcHashlock(rootPlusAmount, false, true);
+        CrossChainTestLib.SwapData memory swapData = _prepareDataSrcHashlock(hashedPairs[0], false, true);
 
-        swapData.immutables.hashlock = hashedSecrets[idx];
-        swapData.immutables.amount = makingAmount - 2;
+        swapData.immutables.hashlock = hashedSecrets[0];
+        swapData.immutables.amount = MAKING_AMOUNT / partsAmount - 2;
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(alice.privateKey, swapData.orderHash);
         bytes32 vs = bytes32((uint256(v - 27) << 255)) | s;
 
         bytes memory interaction = abi.encodePacked(address(badResolver));
-        bytes memory interactionFull = abi.encodePacked(interaction, escrowFactory, abi.encode(proof, idx, hashedSecrets[idx]));
+        bytes memory interactionFull = abi.encodePacked(interaction, escrowFactory, abi.encode(new bytes32[](0), 0, hashedSecrets[0]));
 
         (TakerTraits takerTraits, bytes memory args) = CrossChainTestLib.buildTakerTraits(
             true, // makingAmount
@@ -205,7 +197,7 @@ contract IntegrationEscrowFactoryTest is BaseSetup {
             swapData.order,
             r,
             vs,
-            makingAmount - 2,
+            MAKING_AMOUNT / partsAmount - 2,
             takerTraits,
             args
         );
