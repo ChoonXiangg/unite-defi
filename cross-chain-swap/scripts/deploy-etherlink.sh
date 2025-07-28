@@ -23,7 +23,7 @@ if [ "$NETWORK" = "mainnet" ]; then
     CHAIN_ID="128123"
     echo "Deploying to Etherlink Mainnet"
 elif [ "$NETWORK" = "testnet" ]; then
-    RPC_URL="https://node.etherlink-testnet.com"
+    RPC_URL="https://node.ghostnet.etherlink.com"
     CHAIN_ID="128123"
     echo "Deploying to Etherlink Testnet"
 else
