@@ -7,8 +7,8 @@ pragma solidity ^0.8.19;
 
 contract UniteRewardToken {
     // Token basic information
-    string public name = "Unite Reward Token";
-    string public symbol = "URT";
+    string public name = "SYBAU Token";
+    string public symbol = "SYBAU";
     uint8 public decimals = 18;
     uint256 private _totalSupply;
     
@@ -27,6 +27,7 @@ contract UniteRewardToken {
     event Approval(address indexed owner, address indexed spender, uint256 value);
     event Mint(address indexed to, uint256 amount, string reason);
     event TokensSpent(address indexed user, uint256 amount, string item);
+    event UserTransfer(address indexed from, address indexed to, uint256 amount, string message);
     
     // Modifiers - these are like security checks
     modifier onlyOwner() {
@@ -86,9 +87,24 @@ contract UniteRewardToken {
     // Helper function for frontend: accepts USD as regular decimal number
     // Example: mintRewardForSwapSimple(userAddress, 100.5) for $100.50
     function mintRewardForSwapSimple(address to, uint256 usdCents) external onlyMinter {
+        require(to != address(0), "Cannot mint to zero address");
+        require(usdCents > 0, "USD amount must be positive");
+        
         // Convert cents to wei format: $100.50 = 10050 cents = 10050 * 10^16 wei
         uint256 usdWei = usdCents * 1e16;
-        mintRewardForSwap(to, usdWei);
+        
+        // Calculate reward tokens: usdAmount / 100
+        uint256 rewardTokens = usdWei / 100;
+        
+        // Only mint if reward is meaningful (at least 0.001 token = $0.10 swap)
+        require(rewardTokens >= 1e15, "Swap amount too small for reward");
+        
+        // Create new tokens and add to user's balance
+        _totalSupply += rewardTokens;
+        _balances[to] += rewardTokens;
+        
+        emit Transfer(address(0), to, rewardTokens);
+        emit Mint(to, rewardTokens, "Swap Reward");
     }
     
     // View function to calculate reward without minting (for previews)
@@ -106,15 +122,31 @@ contract UniteRewardToken {
     }
     
     // Function for users to spend tokens in our app
+    // Tokens are transferred to the contract owner instead of being burned
     function spendTokens(uint256 amount, string memory itemName) external {
         require(_balances[msg.sender] >= amount, "Insufficient token balance");
         
-        // Remove tokens from user's balance (burn them)
+        // Transfer tokens from user to owner
         _balances[msg.sender] -= amount;
-        _totalSupply -= amount;
+        _balances[owner] += amount;
         
-        emit Transfer(msg.sender, address(0), amount);
+        emit Transfer(msg.sender, owner, amount);
         emit TokensSpent(msg.sender, amount, itemName);
+    }
+    
+    // Function for users to transfer tokens to other users with a message
+    function transferToUser(address to, uint256 amount, string memory message) external {
+        require(to != address(0), "Cannot transfer to zero address");
+        require(to != msg.sender, "Cannot transfer to yourself");
+        require(_balances[msg.sender] >= amount, "Insufficient token balance");
+        require(amount > 0, "Transfer amount must be positive");
+        
+        // Transfer tokens from sender to recipient
+        _balances[msg.sender] -= amount;
+        _balances[to] += amount;
+        
+        emit Transfer(msg.sender, to, amount);
+        emit UserTransfer(msg.sender, to, amount, message);
     }
     
     // Admin function to change who can mint tokens

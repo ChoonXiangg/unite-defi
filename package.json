@@ -6,24 +6,30 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "hardhat:node": "hardhat node",
+    "hardhat:compile": "hardhat compile",
+    "hardhat:test": "hardhat test",
+    "deploy:local": "hardhat run hardhat-deployment-scripts/deploy-sybau-token.js --network hardhat",
+    "deploy:sepolia": "hardhat run hardhat-deployment-scripts/deploy-sybau-token.js --network sepolia",
+    "deploy:mainnet": "hardhat run hardhat-deployment-scripts/deploy-sybau-token.js --network mainnet",
+    "verify:sepolia": "hardhat verify --network sepolia",
+    "verify:mainnet": "hardhat verify --network mainnet"
   },
   "dependencies": {
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "next": "15.4.4",
     "ethers": "^6.13.4",
-    "wagmi": "^2.16.0",
-    "@tanstack/react-query": "^5.61.6",
-    "viem": "^2.25.4",
-    "@web3modal/wagmi": "^5.1.11",
-    "axios": "^1.7.9"
+    "next": "15.4.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
+    "dotenv": "^17.2.1",
     "eslint": "^9",
     "eslint-config-next": "15.4.4",
-    "@eslint/eslintrc": "^3"
+    "hardhat": "^2.26.1",
+    "tailwindcss": "^4"
   }
 }

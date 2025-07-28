@@ -1,0 +1,28 @@
+{
+  "network": "arbitrumSepolia",
+  "chainId": "421614",
+  "contractAddress": "0xaf8e9C1AC0A7c1d8066615335665B1333821850b",
+  "deployerAddress": "0xD26E4c797873F44A61Fbe24CC561Ee1F00A2a99C",
+  "tokenName": "SYBAU Token",
+  "tokenSymbol": "SYBAU",
+  "tokenDecimals": "18",
+  "deploymentTimestamp": "2025-07-28T16:22:44.716Z",
+  "deploymentBlockNumber": "178257527",
+  "contractABI": [
+    "function name() view returns (string)",
+    "function symbol() view returns (string)",
+    "function decimals() view returns (uint8)",
+    "function totalSupply() view returns (uint256)",
+    "function balanceOf(address) view returns (uint256)",
+    "function mintRewardForSwapSimple(address to, uint256 usdCents)",
+    "function calculateReward(uint256 usdCents) view returns (uint256)",
+    "function spendTokens(uint256 amount, string memory itemName)",
+    "function transferToUser(address to, uint256 amount, string memory message)",
+    "function owner() view returns (address)",
+    "function minter() view returns (address)",
+    "function setMinter(address newMinter)",
+    "event Transfer(address indexed from, address indexed to, uint256 value)",
+    "event Mint(address indexed to, uint256 amount, string reason)",
+    "event UserTransfer(address indexed from, address indexed to, uint256 amount, string message)"
+  ]
+}
