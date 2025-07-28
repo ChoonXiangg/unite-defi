@@ -10,10 +10,38 @@ export default function Wallet() {
   const [editingWallet, setEditingWallet] = useState(null);
   const [editUsername, setEditUsername] = useState('');
   const [editLabel, setEditLabel] = useState('');
+  const [showPrivateKey, setShowPrivateKey] = useState(null);
+  const [refreshInterval, setRefreshInterval] = useState(null);
 
   useEffect(() => {
     loadWallets();
   }, []);
+
+  // Auto-refresh portfolio when active wallet changes
+  useEffect(() => {
+    if (activeWallet) {
+      // Initial load
+      loadPortfolio(activeWallet.walletId, activeWallet.password);
+      
+      // Set up auto-refresh every 30 seconds
+      const interval = setInterval(() => {
+        loadPortfolio(activeWallet.walletId, activeWallet.password);
+      }, 30000);
+      
+      setRefreshInterval(interval);
+      
+      return () => {
+        if (interval) {
+          clearInterval(interval);
+        }
+      };
+    } else {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        setRefreshInterval(null);
+      }
+    }
+  }, [activeWallet]);
 
   const loadWallets = async () => {
     try {
@@ -148,7 +176,7 @@ export default function Wallet() {
     }
 
     const blockchain = prompt('Enter blockchain (evm/tezos):');
-    const network = prompt('Enter network (ethereum/bsc/polygon/mainnet/ghostnet):');
+    const network = prompt('Enter network (ethereum/sepolia/bsc/polygon/arbitrumSepolia/mainnet/ghostnet):');
     const to = prompt('Enter recipient address:');
     const amount = prompt('Enter amount:');
 
@@ -261,6 +289,38 @@ export default function Wallet() {
     setEditLabel('');
   };
 
+  const viewPrivateKey = async (walletId) => {
+    const walletPassword = prompt('Enter wallet password to view private key:');
+    if (!walletPassword) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/wallet/private-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletId, password: walletPassword })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setShowPrivateKey({
+          walletId,
+          evmPrivateKey: data.privateKeys.evm,
+          tezosPrivateKey: data.privateKeys.tezos
+        });
+      } else {
+        alert('Failed to retrieve private keys: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error viewing private key: ' + error.message);
+    }
+    setLoading(false);
+  };
+
+  const hidePrivateKey = () => {
+    setShowPrivateKey(null);
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1>Unite DeFi Wallet</h1>
@@ -359,6 +419,12 @@ export default function Wallet() {
                       Edit
                     </button>
                     <button 
+                      onClick={() => viewPrivateKey(wallet.id)}
+                      style={{ marginRight: '10px', backgroundColor: '#ffc107', color: 'black' }}
+                    >
+                      View Private Key
+                    </button>
+                    <button 
                       onClick={() => deleteWallet(wallet.id)}
                       style={{ backgroundColor: '#ff4444', color: 'white' }}
                     >
@@ -377,9 +443,21 @@ export default function Wallet() {
           <h2>Active Wallet</h2>
           <p><strong>EVM Address:</strong> {activeWallet.addresses.evm}</p>
           <p><strong>Tezos Address:</strong> {activeWallet.addresses.tezos}</p>
-          <button onClick={sendTransaction} disabled={loading}>
-            Send Transaction
-          </button>
+          <div style={{ marginTop: '10px' }}>
+            <button onClick={sendTransaction} disabled={loading} style={{ marginRight: '10px' }}>
+              Send Transaction
+            </button>
+            <button 
+              onClick={() => loadPortfolio(activeWallet.walletId, activeWallet.password)}
+              disabled={loading}
+              style={{ backgroundColor: '#28a745', color: 'white' }}
+            >
+              🔄 Refresh Balances
+            </button>
+          </div>
+          <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+            💡 Balances auto-refresh every 30 seconds
+          </p>
         </div>
       )}
 
@@ -401,6 +479,79 @@ export default function Wallet() {
               {data.error && <p style={{ color: 'red' }}>Error: {data.error}</p>}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Private Key Modal */}
+      {showPrivateKey && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.7)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '30px', 
+            borderRadius: '10px',
+            maxWidth: '600px',
+            width: '90%'
+          }}>
+            <h3>🔐 Private Keys</h3>
+            <div style={{ marginBottom: '20px' }}>
+              <p><strong>⚠️ WARNING:</strong> Never share your private keys with anyone!</p>
+            </div>
+            
+            <div style={{ marginBottom: '15px' }}>
+              <label><strong>EVM Private Key:</strong></label>
+              <div style={{ 
+                backgroundColor: '#f8f9fa', 
+                border: '1px solid #ddd', 
+                padding: '10px', 
+                borderRadius: '5px',
+                wordBreak: 'break-all',
+                fontFamily: 'monospace',
+                fontSize: '12px'
+              }}>
+                {showPrivateKey.evmPrivateKey}
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <label><strong>Tezos Private Key:</strong></label>
+              <div style={{ 
+                backgroundColor: '#f8f9fa', 
+                border: '1px solid #ddd', 
+                padding: '10px', 
+                borderRadius: '5px',
+                wordBreak: 'break-all',
+                fontFamily: 'monospace',
+                fontSize: '12px'
+              }}>
+                {showPrivateKey.tezosPrivateKey}
+              </div>
+            </div>
+            
+            <button 
+              onClick={hidePrivateKey}
+              style={{ 
+                backgroundColor: '#007bff', 
+                color: 'white', 
+                padding: '10px 20px',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
 

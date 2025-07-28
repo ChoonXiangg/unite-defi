@@ -32,7 +32,18 @@ async function main() {
   const address = await nft.getAddress();
   
   console.log("✅ Contract deployed to:", address);
-  console.log("🔍 Verify on Sepolia Etherscan:", `https://sepolia.etherscan.io/address/${address}`);
+  // Determine explorer URL based on network
+  const network = hre.network.name;
+  let explorerUrl;
+  if (network === 'arbitrum') {
+    explorerUrl = `https://arbiscan.io/address/${address}`;
+  } else if (network === 'arbitrumSepolia') {
+    explorerUrl = `https://sepolia.arbiscan.io/address/${address}`;
+  } else {
+    explorerUrl = `https://sepolia.etherscan.io/address/${address}`;
+  }
+  
+  console.log("🔍 Verify on block explorer:", explorerUrl);
   
   // Save contract info for the application
   const contractInfo = {
@@ -42,7 +53,7 @@ async function main() {
     description: "Unite DeFi NFT Collection",
     baseURI: "",
     owner: deployer.address,
-    network: "sepolia",
+    network: hre.network.name,
     deployedAt: new Date().toISOString(),
     royaltyReceiver: deployer.address,
     royaltyFeeBps: 500,
