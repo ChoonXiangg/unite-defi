@@ -110,7 +110,10 @@ export default function Wallet() {
 
       const data = await response.json();
       if (data.success) {
-        setActiveWallet({ ...data, password: walletPassword });
+        const walletData = { ...data, password: walletPassword };
+        setActiveWallet(walletData);
+        // Save to localStorage for NFT page access
+        localStorage.setItem('activeWallet', JSON.stringify(walletData));
         loadPortfolio(walletId, walletPassword);
       } else {
         alert('Failed to unlock wallet: ' + data.error);
