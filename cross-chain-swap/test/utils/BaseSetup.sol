@@ -161,7 +161,8 @@ contract BaseSetup is Test, Utils {
             DST_SAFETY_DEPOSIT,
             address(0),
             fakeOrder,
-            allowMultipleFills
+            allowMultipleFills,
+            100 // Default partsAmount for multiple fills
         );
     }
 
@@ -169,6 +170,15 @@ contract BaseSetup is Test, Utils {
         bytes32 hashlock,
         bool fakeOrder,
         bool allowMultipleFills
+    ) internal returns(CrossChainTestLib.SwapData memory) {
+        return _prepareDataSrcHashlock(hashlock, fakeOrder, allowMultipleFills, 100);
+    }
+
+    function _prepareDataSrcHashlock(
+        bytes32 hashlock,
+        bool fakeOrder,
+        bool allowMultipleFills,
+        uint256 partsAmount
     ) internal returns(CrossChainTestLib.SwapData memory) {
         return _prepareDataSrcCustom(
             hashlock,
@@ -178,7 +188,8 @@ contract BaseSetup is Test, Utils {
             DST_SAFETY_DEPOSIT,
             address(0),
             fakeOrder,
-            allowMultipleFills
+            allowMultipleFills,
+            partsAmount
         );
     }
 
@@ -190,7 +201,8 @@ contract BaseSetup is Test, Utils {
         uint256 dstSafetyDeposit,
         address receiver,
         bool fakeOrder,
-        bool allowMultipleFills
+        bool allowMultipleFills,
+        uint256 partsAmount
     ) internal returns(CrossChainTestLib.SwapData memory swapData) {
         swapData = CrossChainTestLib.prepareDataSrc(
             CrossChainTestLib.OrderDetails({
@@ -218,7 +230,8 @@ contract BaseSetup is Test, Utils {
                 hashlock: hashlock,
                 timelocks: timelocks,
                 fakeOrder: fakeOrder,
-                allowMultipleFills: allowMultipleFills
+                allowMultipleFills: allowMultipleFills,
+                partsAmount: partsAmount
             }),
             address(escrowFactory),
             limitOrderProtocol

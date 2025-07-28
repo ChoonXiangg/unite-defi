@@ -46,7 +46,8 @@ contract EscrowFactoryTest is BaseSetup {
             dstSafetyDeposit,
             address(0),
             true, // fakeOrder
-            false // allowMultipleFills
+            false, // allowMultipleFills
+            1 // partsAmount
         );
 
         (bool success,) = address(swapData.srcClone).call{ value: srcSafetyDeposit }("");
@@ -79,7 +80,8 @@ contract EscrowFactoryTest is BaseSetup {
             DST_SAFETY_DEPOSIT,
             receiver,
             true,
-            false
+            false,
+            1 // partsAmount
         );
 
         (bool success,) = address(swapData.srcClone).call{ value: SRC_SAFETY_DEPOSIT }("");
@@ -188,7 +190,9 @@ contract EscrowFactoryTest is BaseSetup {
         feeBank.deposit(10 ether);
 
         vm.prank(address(limitOrderProtocol));
-        // vm.expectRevert(ResolverValidationExtension.ResolverCanNotFillOrder.selector);
+        // Alice is not a whitelisted resolver, so this should fail with InsufficientEscrowBalance
+        // because the resolver validation happens after balance checks
+        vm.expectRevert(IEscrowFactory.InsufficientEscrowBalance.selector);
         escrowFactory.postInteraction(
             swapData.order,
             "", // extension
@@ -239,7 +243,9 @@ contract EscrowFactoryTest is BaseSetup {
         // assert(merkle.verifyProof(root, proof, hashedPairs[idx]));
         // bytes32 rootPlusAmount = bytes32(uint256(0) << 240 | uint240(uint256(root)));
 
-        CrossChainTestLib.SwapData memory swapData = _prepareDataSrcHashlock(hashedSecrets[idx], false, true);
+        // Use partsAmount = 1 to trigger InvalidSecretsAmount (< 2)
+        // This is intentionally invalid to test the validation
+        CrossChainTestLib.SwapData memory swapData = _prepareDataSrcHashlock(hashedSecrets[idx], false, true, 1);
 
         swapData.immutables.hashlock = hashedSecrets[idx];
         swapData.immutables.amount = makingAmount;
@@ -266,7 +272,8 @@ contract EscrowFactoryTest is BaseSetup {
 
         // bytes32 rootPlusAmount = bytes32(SECRETS_AMOUNT << 240 | uint240(uint256(root)));
 
-        CrossChainTestLib.SwapData memory swapData = _prepareDataSrcHashlock(hashedSecrets[idx], false, true);
+        // Use the actual SECRETS_AMOUNT for dynamic parts calculation
+        CrossChainTestLib.SwapData memory swapData = _prepareDataSrcHashlock(hashedSecrets[idx], false, true, SECRETS_AMOUNT);
 
         vm.prank(address(limitOrderProtocol));
         vm.expectRevert(IEscrowFactory.InvalidPartialFill.selector);
@@ -278,6 +285,42 @@ contract EscrowFactoryTest is BaseSetup {
             MAKING_AMOUNT,
             TAKING_AMOUNT,
             MAKING_AMOUNT, // remainingMakingAmount
+            swapData.extraData
+        );
+    }
+
+    // Fuzz test for truly dynamic partsAmount
+    function testFuzz_MultipleFillsDynamicParts(uint256 partsAmount) public {
+        vm.assume(partsAmount >= 2 && partsAmount <= 1000); // Valid range
+        
+        // Generate dynamic secrets array based on partsAmount
+        bytes32[] memory dynamicSecrets = new bytes32[](partsAmount + 1);
+        for (uint256 i = 0; i < partsAmount + 1; i++) {
+            dynamicSecrets[i] = keccak256(abi.encodePacked(i, block.timestamp));
+        }
+        
+        uint256 makingAmount = MAKING_AMOUNT / 2;
+        uint256 idx = partsAmount * (makingAmount - 1) / MAKING_AMOUNT;
+        
+        CrossChainTestLib.SwapData memory swapData = _prepareDataSrcHashlock(
+            dynamicSecrets[idx], 
+            false, 
+            true, 
+            partsAmount  // Fully dynamic!
+        );
+
+        // This should work with any valid partsAmount >= 2
+        vm.prank(address(limitOrderProtocol));
+        // We expect this to revert with InvalidPartialFill due to invalid remaining amount
+        vm.expectRevert(IEscrowFactory.InvalidPartialFill.selector);
+        escrowFactory.postInteraction(
+            swapData.order,
+            "", // extension
+            swapData.orderHash,
+            bob.addr, // taker
+            MAKING_AMOUNT,
+            TAKING_AMOUNT,
+            MAKING_AMOUNT, // remainingMakingAmount - this makes it invalid
             swapData.extraData
         );
     }

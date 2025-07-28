@@ -82,7 +82,8 @@ contract DeployEscrowSrc is Script {
                 hashlock: hashlock,
                 timelocks: timelocks,
                 fakeOrder: false,
-                allowMultipleFills: false
+                allowMultipleFills: false,
+                partsAmount: 1
             }),
             escrowFactory,
             limitOrderProtocol

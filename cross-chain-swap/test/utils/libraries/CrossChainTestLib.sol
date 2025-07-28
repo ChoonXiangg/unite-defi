@@ -81,6 +81,7 @@ library CrossChainTestLib {
         Timelocks timelocks;
         bool fakeOrder;
         bool allowMultipleFills;
+        uint256 partsAmount; // Number of parts for multiple fills (must be >= 2)
     }
 
     struct SwapData {
@@ -304,20 +305,56 @@ library CrossChainTestLib {
         );
     }
 
+    function buidDynamicDataWithParts(
+        bytes32 hashlock,
+        uint256 chainId,
+        address token,
+        uint256 srcSafetyDeposit,
+        uint256 dstSafetyDeposit,
+        Timelocks timelocks,
+        uint256 partsAmount
+    ) internal pure returns (bytes memory) {
+        // For multiple fills, encode partsAmount in the upper 16 bits of hashlockInfo
+        bytes32 hashlockInfo = bytes32((partsAmount << 240) | uint240(uint256(hashlock)));
+        return (
+            abi.encode(
+                hashlockInfo,
+                chainId,
+                token,
+                (srcSafetyDeposit << 128) | dstSafetyDeposit,
+                timelocks
+            )
+        );
+    }
+
     function prepareDataSrc(
         OrderDetails memory orderDetails,
         EscrowDetails memory escrowDetails,
         address factory,
         IOrderMixin limitOrderProtocol
     ) internal returns(SwapData memory swapData) {
-        swapData.extraData = buidDynamicData(
-            escrowDetails.hashlock,
-            block.chainid,
-            orderDetails.dstToken,
-            orderDetails.srcSafetyDeposit,
-            orderDetails.dstSafetyDeposit,
-            escrowDetails.timelocks
-        );
+        if (escrowDetails.allowMultipleFills) {
+            // Use the specified partsAmount from test configuration
+            uint256 partsAmount = escrowDetails.partsAmount > 0 ? escrowDetails.partsAmount : 2; // Default to 2 if not specified
+            swapData.extraData = buidDynamicDataWithParts(
+                escrowDetails.hashlock,
+                block.chainid,
+                orderDetails.dstToken,
+                orderDetails.srcSafetyDeposit,
+                orderDetails.dstSafetyDeposit,
+                escrowDetails.timelocks,
+                partsAmount
+            );
+        } else {
+            swapData.extraData = buidDynamicData(
+                escrowDetails.hashlock,
+                block.chainid,
+                orderDetails.dstToken,
+                orderDetails.srcSafetyDeposit,
+                orderDetails.dstSafetyDeposit,
+                escrowDetails.timelocks
+            );
+        }
 
         bytes memory whitelist = abi.encodePacked(uint32(block.timestamp)); // auction start time
         for (uint256 i = 0; i < orderDetails.resolvers.length; i++) {

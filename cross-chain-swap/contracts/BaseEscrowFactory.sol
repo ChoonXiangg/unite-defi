@@ -9,6 +9,7 @@ import { Address, AddressLib } from "solidity-utils/contracts/libraries/AddressL
 import { SafeERC20 } from "solidity-utils/contracts/libraries/SafeERC20.sol";
 
 import { IOrderMixin } from "limit-order-protocol/contracts/interfaces/IOrderMixin.sol";
+import { IAmountGetter } from "limit-order-protocol/contracts/interfaces/IAmountGetter.sol";
 import { MakerTraitsLib } from "limit-order-protocol/contracts/libraries/MakerTraitsLib.sol";
 
 import { ImmutablesLib } from "./libraries/ImmutablesLib.sol";
@@ -26,7 +27,7 @@ import { IFeeBank } from "limit-order-settlement/contracts/interfaces/IFeeBank.s
  * @dev Immutable variables must be set in the constructor of the derived contracts.
  * @custom:security-contact security@1inch.io
  */
-abstract contract BaseEscrowFactory is IEscrowFactory, MerkleStorageInvalidator {
+abstract contract BaseEscrowFactory is IEscrowFactory, IAmountGetter, MerkleStorageInvalidator {
     using AddressLib for Address;
     using Clones for address;
     using ImmutablesLib for IBaseEscrow.Immutables;
@@ -78,6 +79,7 @@ abstract contract BaseEscrowFactory is IEscrowFactory, MerkleStorageInvalidator 
         bytes calldata extraData
     ) internal {
         uint256 superArgsLength = extraData.length - SRC_IMMUTABLES_LENGTH;
+        
         // super._postInteraction(
         //     order, extension, orderHash, taker, makingAmount, takingAmount, remainingMakingAmount, extraData[:superArgsLength]
         // );
@@ -86,6 +88,8 @@ abstract contract BaseEscrowFactory is IEscrowFactory, MerkleStorageInvalidator 
         assembly ("memory-safe") {
             extraDataArgs := add(extraData.offset, superArgsLength)
         }
+        
+        // Remove my custom validation - let the existing logic handle it
 
         bytes32 hashlock;
 
@@ -222,4 +226,44 @@ abstract contract BaseEscrowFactory is IEscrowFactory, MerkleStorageInvalidator 
 
         return calculatedIndex + 1 == validatedIndex;
     }
+
+    /**
+     * @notice Implementation of IAmountGetter interface required by 1inch Limit Order Protocol.
+     * @dev This function is called by the LOP to determine the actual making amount for orders.
+     * For escrow contracts, we typically want to use the standard calculation.
+     */
+    function getMakingAmount(
+        IOrderMixin.Order calldata order,
+        bytes calldata /* extension */,
+        bytes32 /* orderHash */,
+        address /* taker */,
+        uint256 takingAmount,
+        uint256 /* remainingMakingAmount */,
+        bytes calldata /* extraData */
+    ) external pure override returns (uint256) {
+        // Standard proportional calculation: makingAmount = (takingAmount * order.makingAmount) / order.takingAmount
+        if (order.takingAmount == 0) revert InvalidOrder();
+        return (takingAmount * order.makingAmount) / order.takingAmount;
+    }
+
+    /**
+     * @notice Implementation of IAmountGetter interface required by 1inch Limit Order Protocol.
+     * @dev This function is called by the LOP to determine the actual taking amount for orders.
+     * For escrow contracts, we typically want to use the standard calculation.
+     */
+    function getTakingAmount(
+        IOrderMixin.Order calldata order,
+        bytes calldata /* extension */,
+        bytes32 /* orderHash */,
+        address /* taker */,
+        uint256 makingAmount,
+        uint256 /* remainingMakingAmount */,
+        bytes calldata /* extraData */
+    ) external pure override returns (uint256) {
+        // Standard proportional calculation: takingAmount = (makingAmount * order.takingAmount) / order.makingAmount
+        if (order.makingAmount == 0) revert InvalidOrder();
+        return (makingAmount * order.takingAmount) / order.makingAmount;
+    }
+
+    error InvalidOrder();
 }

@@ -822,7 +822,8 @@ contract EscrowTest is BaseSetup {
             DST_SAFETY_DEPOSIT,
             receiver,
             true,
-            false
+            false,
+            1 // partsAmount
         );
 
         (bool success,) = address(swapData.srcClone).call{ value: SRC_SAFETY_DEPOSIT }("");
