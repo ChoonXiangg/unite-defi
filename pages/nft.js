@@ -210,7 +210,7 @@ export default function NFT() {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>NFT Creator - Sepolia Testnet</h1>
+      <h1>NFT Creator - Arbitrum Sepolia</h1>
       <p><strong>Active Wallet:</strong> {activeWallet.addresses?.evm}</p>
 
       {/* Tabs */}
@@ -257,8 +257,8 @@ export default function NFT() {
         <h3>📋 Deployed Contract</h3>
         <p><strong>Contract:</strong> Unite DeFi NFT (UNITE)</p>
         <p><strong>Address:</strong> 0x176E38D94AD24022fDb813E8F3f3fe10Fde17249</p>
-        <p><strong>Network:</strong> Sepolia Testnet</p>
-        <p><strong>Verify:</strong> <a href="https://sepolia.etherscan.io/address/0x176E38D94AD24022fDb813E8F3f3fe10Fde17249" target="_blank" rel="noopener noreferrer">View on Etherscan</a></p>
+        <p><strong>Network:</strong> Arbitrum Sepolia</p>
+        <p><strong>Verify:</strong> <a href="https://sepolia.arbiscan.io/address/0x176E38D94AD24022fDb813E8F3f3fe10Fde17249" target="_blank" rel="noopener noreferrer">View on Arbiscan</a></p>
       </div>
 
       {/* Mint NFT Tab */}
