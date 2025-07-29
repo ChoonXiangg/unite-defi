@@ -11,7 +11,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'userAddress parameter required' });
     }
 
-    const contractAddress = '0xaf8e9C1AC0A7c1d8066615335665B1333821850b';
+    const contractAddress = '0x032CdA4d263385dDe296C6C288B56A750CcCF047';
     const apiKey = process.env.NEXT_PUBLIC_ONEINCH_API_KEY;
     
     console.log('📜 Getting transaction history via 1inch API...');
@@ -37,25 +37,25 @@ export default async function handler(req, res) {
         const data = await response.json();
         console.log('📊 1inch History API response:', data);
         
-        // Filter for SYBAU token transactions
-        const sybauTransactions = [];
+        // Filter for PGS token transactions
+        const pgsTransactions = [];
         
         if (data.items) {
           for (const item of data.items) {
-            // Look for transactions involving our SYBAU contract
+            // Look for transactions involving our PGS contract
             if (item.details && item.details.some) {
-              const sybauDetails = item.details.filter(detail => 
+              const pgsDetails = item.details.filter(detail => 
                 detail.address && detail.address.toLowerCase() === contractAddress.toLowerCase()
               );
               
-              if (sybauDetails.length > 0) {
-                sybauTransactions.push({
+              if (pgsDetails.length > 0) {
+                pgsTransactions.push({
                   id: item.txHash + '_' + item.logIndex,
                   txHash: item.txHash,
                   timestamp: new Date(item.timeMs).toLocaleString(),
                   blockNumber: item.blockNumber,
                   type: item.action || 'unknown',
-                  details: sybauDetails
+                  details: pgsDetails
                 });
               }
             }
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
         return res.status(200).json({
           success: true,
           source: '1inch_history_api',
-          transactions: sybauTransactions,
+          transactions: pgsTransactions,
           userAddress,
           contractAddress
         });

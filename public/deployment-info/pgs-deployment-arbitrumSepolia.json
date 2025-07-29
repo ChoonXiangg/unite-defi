@@ -1,13 +1,13 @@
 {
   "network": "arbitrumSepolia",
   "chainId": "421614",
-  "contractAddress": "0xaf8e9C1AC0A7c1d8066615335665B1333821850b",
+  "contractAddress": "0x032CdA4d263385dDe296C6C288B56A750CcCF047",
   "deployerAddress": "0xD26E4c797873F44A61Fbe24CC561Ee1F00A2a99C",
-  "tokenName": "SYBAU Token",
-  "tokenSymbol": "SYBAU",
+  "tokenName": "PGS Token",
+  "tokenSymbol": "PGS",
   "tokenDecimals": "18",
-  "deploymentTimestamp": "2025-07-28T16:22:44.716Z",
-  "deploymentBlockNumber": "178257527",
+  "deploymentTimestamp": "2025-07-29T12:29:17.051Z",
+  "deploymentBlockNumber": "178540295",
   "contractABI": [
     "function name() view returns (string)",
     "function symbol() view returns (string)",

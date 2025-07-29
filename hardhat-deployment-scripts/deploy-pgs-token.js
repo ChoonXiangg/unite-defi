@@ -1,5 +1,5 @@
-// SYBAU Token Deployment Script
-// This script deploys the UniteRewardToken contract and renames it to SYBAU
+// PGS Token Deployment Script
+// This script deploys the UniteRewardToken contract (PGS Token)
 // Can be used for local testing, testnet, and mainnet deployment
 
 const { ethers } = require("hardhat");
@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 
 async function main() {
-  console.log("🚀 Starting SYBAU Token Deployment...");
+  console.log("🚀 Starting PGS Token Deployment...");
   
   // Get the network we're deploying to
   const network = await ethers.provider.getNetwork();
@@ -23,28 +23,28 @@ async function main() {
   
   // Get the contract factory
   console.log("📝 Getting UniteRewardToken contract factory...");
-  const SybauToken = await ethers.getContractFactory("UniteRewardToken");
+  const PgsToken = await ethers.getContractFactory("UniteRewardToken");
   
   // Deploy the contract
-  console.log("⚡ Deploying SYBAU Token contract...");
-  const sybauToken = await SybauToken.deploy();
+  console.log("⚡ Deploying PGS Token contract...");
+  const pgsToken = await PgsToken.deploy();
 
   // Wait for deployment to be mined
   console.log("⏳ Waiting for deployment transaction to be mined...");
-  await sybauToken.waitForDeployment();
+  await pgsToken.waitForDeployment();
   
   // Get the deployed contract address
-  const contractAddress = await sybauToken.getAddress();
-  console.log(`✅ SYBAU Token deployed to: ${contractAddress}`);
+  const contractAddress = await pgsToken.getAddress();
+  console.log(`✅ PGS Token deployed to: ${contractAddress}`);
   
   // Verify the deployment by calling contract functions
   console.log("🔍 Verifying deployment...");
-  const tokenName = await sybauToken.name();
-  const tokenSymbol = await sybauToken.symbol();
-  const tokenDecimals = await sybauToken.decimals();
-  const totalSupply = await sybauToken.totalSupply();
-  const owner = await sybauToken.owner();
-  const minter = await sybauToken.minter();
+  const tokenName = await pgsToken.name();
+  const tokenSymbol = await pgsToken.symbol();
+  const tokenDecimals = await pgsToken.decimals();
+  const totalSupply = await pgsToken.totalSupply();
+  const owner = await pgsToken.owner();
+  const minter = await pgsToken.minter();
   
   console.log("📊 Contract Details:");
   console.log(`   Name: ${tokenName}`);
@@ -57,7 +57,7 @@ async function main() {
   // Test the reward calculation function
   console.log("🧮 Testing reward calculation...");
   const testUsdCents = 10000; // $100.00
-  const expectedReward = await sybauToken.calculateReward(testUsdCents);
+  const expectedReward = await pgsToken.calculateReward(testUsdCents);
   console.log(`   $100 swap = ${ethers.formatEther(expectedReward)} ${tokenSymbol} tokens`);
   
   // Save deployment info for frontend integration  
@@ -99,7 +99,7 @@ async function main() {
   
   // Save deployment info to file (use chainId for consistent naming)
   const networkName = network.chainId === 421614n ? 'arbitrumSepolia' : network.name;
-  const deploymentFile = path.join(deploymentDir, `sybau-deployment-${networkName}.json`);
+  const deploymentFile = path.join(deploymentDir, `pgs-deployment-${networkName}.json`);
   fs.writeFileSync(deploymentFile, JSON.stringify(deploymentInfo, null, 2));
   console.log(`💾 Deployment info saved to: ${deploymentFile}`);
   

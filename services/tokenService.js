@@ -69,11 +69,11 @@ export class TokenService {
   async loadContractAddress() {
     try {
       // Try to load from Arbitrum Sepolia deployment info first
-      let response = await fetch('/deployment-info/sybau-deployment-arbitrumSepolia.json')
+      let response = await fetch('/deployment-info/pgs-deployment-arbitrumSepolia.json')
       
       if (!response.ok) {
         // Fallback to regular sepolia if arbitrum sepolia not found
-        response = await fetch('/deployment-info/sybau-deployment-sepolia.json')
+        response = await fetch('/deployment-info/pgs-deployment-sepolia.json')
       }
       
       if (response.ok) {
@@ -93,7 +93,7 @@ export class TokenService {
 
   // Connect to the deployed contract
   async deployContract() {
-    console.log('Connecting to deployed SYBAU contract...')
+    console.log('Connecting to deployed PGS contract...')
     
     // Load contract address from deployment info file
     this.contractAddress = await this.loadContractAddress()
@@ -141,8 +141,8 @@ export class TokenService {
       const userAddress = await this.signer.getAddress()
       console.log(`   User address: ${userAddress}`)
       
-      // Generate a simulated swap transaction ID (in production, this would be real)
-      const swapTransactionId = `swap_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      // Generate unique swap transaction ID
+      const swapTransactionId = `swap_${Date.now()}_${userAddress.slice(-6)}`
       
       // Call backend API (production-like)
       const response = await fetch('/api/reward-tokens', {
@@ -269,17 +269,17 @@ export class TokenService {
     const data = await response.json()
     console.log('📊 1inch API response:', data)
     
-    // Extract SYBAU token balance from response
+    // Extract PGS token balance from response
     const tokenBalance = data[this.contractAddress.toLowerCase()] || data[this.contractAddress]
     
     if (tokenBalance === undefined) {
-      console.log('⚠️ SYBAU token not found in 1inch response, balance is 0')
+      console.log('⚠️ PGS token not found in 1inch response, balance is 0')
       return '0'
     }
     
     // Convert from wei to ether format
     const formattedBalance = ethers.formatEther(tokenBalance)
-    console.log('✅ SYBAU balance from 1inch:', formattedBalance)
+    console.log('✅ PGS balance from 1inch:', formattedBalance)
     
     return formattedBalance
   }

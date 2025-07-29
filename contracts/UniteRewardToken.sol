@@ -7,8 +7,8 @@ pragma solidity ^0.8.19;
 
 contract UniteRewardToken {
     // Token basic information
-    string public name = "SYBAU Token";
-    string public symbol = "SYBAU";
+    string public name = "PGS Token";
+    string public symbol = "PGS";
     uint8 public decimals = 18;
     uint256 private _totalSupply;
     

@@ -1,4 +1,4 @@
-// API endpoint to get user's SYBAU token balance using 1inch Balance API
+// API endpoint to get user's PGS token balance using 1inch Balance API
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -11,10 +11,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'userAddress parameter required' });
     }
 
-    const contractAddress = '0xaf8e9C1AC0A7c1d8066615335665B1333821850b';
+    const contractAddress = '0x032CdA4d263385dDe296C6C288B56A750CcCF047';
     const apiKey = process.env.NEXT_PUBLIC_ONEINCH_API_KEY;
     
-    console.log('🌐 Getting SYBAU balance via 1inch API...');
+    console.log('🌐 Getting PGS balance via 1inch API...');
     console.log('   User:', userAddress);
     console.log('   Contract:', contractAddress);
     console.log('   API Key:', apiKey ? 'Present ✅' : 'Missing ❌');
@@ -37,13 +37,13 @@ export default async function handler(req, res) {
         const data = await response.json();
         console.log('📊 1inch API response:', data);
         
-        // Extract SYBAU token balance
-        const sybauBalance = data[contractAddress.toLowerCase()] || data[contractAddress] || '0';
+        // Extract PGS token balance
+        const pgsBalance = data[contractAddress.toLowerCase()] || data[contractAddress] || '0';
         
         return res.status(200).json({
           success: true,
           source: '1inch_api',
-          balance: sybauBalance,
+          balance: pgsBalance,
           userAddress,
           contractAddress
         });

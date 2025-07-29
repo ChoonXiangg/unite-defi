@@ -264,7 +264,7 @@ export default function TokenTest() {
     }
     
     try {
-      console.log('🔍 Loading SYBAU balance via API...')
+      console.log('🔍 Loading PGS balance via API...')
       console.log('🔍 User address:', userAddress)
       
       // Call our API endpoint that uses 1inch Balance API with fallback
@@ -273,7 +273,7 @@ export default function TokenTest() {
       
       if (result.success) {
         const formattedBalance = result.balance
-        console.log(`✅ Balance loaded via ${result.source}:`, formattedBalance, 'SYBAU')
+        console.log(`✅ Balance loaded via ${result.source}:`, formattedBalance, 'PGS')
         setTokenBalance(formattedBalance)
       } else {
         throw new Error(result.error || 'Failed to get balance')
@@ -289,7 +289,7 @@ export default function TokenTest() {
           const balanceWei = await contractService.getTokenBalance(userAddress)
           const formattedBalance = ethers.formatEther(balanceWei)
           setTokenBalance(formattedBalance)
-          console.log(`✅ Balance from contract service: ${formattedBalance} SYBAU`)
+          console.log(`✅ Balance from contract service: ${formattedBalance} PGS`)
         } catch (contractError) {
           console.error('❌ Contract service also failed:', contractError)
           setTokenBalance('0')
@@ -432,7 +432,7 @@ export default function TokenTest() {
         <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
           <h1 className="text-3xl font-bold text-center mb-4">🧪 Token Test Lab</h1>
           <p className="text-gray-600 text-center mb-8">
-            Isolated testing environment for SYBAU token generation
+            Isolated testing environment for PGS token generation
           </p>
           
           <button
@@ -468,7 +468,7 @@ export default function TokenTest() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">🧪 SYBAU Token Test Lab</h1>
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">🧪 PGS Token Test Lab</h1>
           <p className="text-gray-600">Isolated Token Generation Testing Environment</p>
           <div className="mt-4 flex items-center justify-center space-x-4">
             <span className="text-sm text-gray-500">
@@ -489,7 +489,7 @@ export default function TokenTest() {
             <h2 className="text-xl font-bold mb-4">💱 Token Generator</h2>
             <p className="text-gray-600 mb-6 text-sm">
               Test the token reward calculation<br/>
-              <span className="font-semibold text-purple-600">Rate: $100 USD = 1.0 SYBAU</span>
+              <span className="font-semibold text-purple-600">Rate: $100 USD = 1.0 PGS</span>
             </p>
 
             <div className="space-y-4">
@@ -510,7 +510,7 @@ export default function TokenTest() {
               {previewReward !== '0' && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                   <p className="text-sm text-green-700">
-                    Will generate: <span className="font-bold">{previewReward} SYBAU</span>
+                    Will generate: <span className="font-bold">{previewReward} PGS</span>
                   </p>
                   <p className="text-xs text-green-600 mt-1">
                     Calculation: ${swapAmount} ÷ 100 = {previewReward} tokens
@@ -535,7 +535,7 @@ export default function TokenTest() {
             {/* Enhanced Balance Display */}
             <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 mb-6 border border-purple-200">
               <div className="text-center">
-                <p className="text-sm text-purple-600 mb-1">SYBAU Balance</p>
+                <p className="text-sm text-purple-600 mb-1">PGS Balance</p>
                 {dataLoading ? (
                   <div className="flex items-center justify-center py-4">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
@@ -561,7 +561,7 @@ export default function TokenTest() {
                 disabled={isLoading || parseFloat(tokenBalance) < 0.25}
                 className="w-full bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 text-white font-medium py-2 px-3 rounded-lg transition-colors text-xs"
               >
-                🎨 Basic Theme - 0.25 SYBAU
+                🎨 Basic Theme - 0.25 PGS
               </button>
               
               <button
@@ -569,7 +569,7 @@ export default function TokenTest() {
                 disabled={isLoading || parseFloat(tokenBalance) < 0.5}
                 className="w-full bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 text-white font-medium py-2 px-3 rounded-lg transition-colors text-xs"
               >
-                ⚡ Premium Features - 0.5 SYBAU
+                ⚡ Premium Features - 0.5 PGS
               </button>
               
               <button
@@ -577,7 +577,7 @@ export default function TokenTest() {
                 disabled={isLoading || parseFloat(tokenBalance) < 1.0}
                 className="w-full bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 text-white font-medium py-2 px-3 rounded-lg transition-colors text-xs"
               >
-                🔧 Advanced Tools - 1.0 SYBAU
+                🔧 Advanced Tools - 1.0 PGS
               </button>
               
               <button
@@ -585,7 +585,7 @@ export default function TokenTest() {
                 disabled={isLoading || parseFloat(tokenBalance) < 2.5}
                 className="w-full bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 text-white font-medium py-2 px-3 rounded-lg transition-colors text-xs"
               >
-                👑 VIP Membership - 2.5 SYBAU
+                👑 VIP Membership - 2.5 PGS
               </button>
             </div>
           </div>
@@ -594,7 +594,7 @@ export default function TokenTest() {
           <div className="bg-white rounded-lg shadow-xl p-6">
             <h2 className="text-xl font-bold mb-4">🔄 Transfer Tokens</h2>
             <p className="text-gray-600 mb-4 text-sm">
-              Send SYBAU tokens to other users
+              Send PGS tokens to other users
             </p>
 
             <div className="space-y-4">
@@ -613,7 +613,7 @@ export default function TokenTest() {
 
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Amount (SYBAU)
+                  Amount (PGS)
                 </label>
                 <input
                   type="number"
@@ -624,7 +624,7 @@ export default function TokenTest() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Available: {tokenBalance} SYBAU
+                  Available: {tokenBalance} PGS
                 </p>
               </div>
 
@@ -672,21 +672,21 @@ export default function TokenTest() {
                     {tx.type === 'mint' ? (
                       <div className="text-sm">
                         <p className="font-semibold text-green-600">
-                          ✅ Received {tx.tokensEarned} SYBAU
+                          ✅ Received {tx.tokensEarned} PGS
                         </p>
                         <p className="text-gray-600">Token mint (reward)</p>
                       </div>
                     ) : tx.type === 'spend' ? (
                       <div className="text-sm">
                         <p className="font-semibold text-orange-600">
-                          💸 Spent {tx.amountSpent} SYBAU
+                          💸 Spent {tx.amountSpent} PGS
                         </p>
                         <p className="text-gray-600">On {tx.itemPurchased}</p>
                       </div>
                     ) : tx.type === 'transfer' ? (
                       <div className="text-sm">
                         <p className="font-semibold text-blue-600">
-                          🔄 Sent {tx.amountTransferred} SYBAU
+                          🔄 Sent {tx.amountTransferred} PGS
                         </p>
                         <p className="text-gray-600">To {tx.recipient.slice(0, 8)}...{tx.recipient.slice(-6)}</p>
                         {tx.message && (
@@ -696,7 +696,7 @@ export default function TokenTest() {
                     ) : tx.type === 'receive' ? (
                       <div className="text-sm">
                         <p className="font-semibold text-purple-600">
-                          📥 Received {tx.amountReceived} SYBAU
+                          📥 Received {tx.amountReceived} PGS
                         </p>
                         <p className="text-gray-600">From {tx.sender.slice(0, 8)}...{tx.sender.slice(-6)}</p>
                         {tx.message && (
