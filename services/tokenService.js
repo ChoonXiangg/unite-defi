@@ -7,8 +7,14 @@ export class TokenService {
   constructor() {
     this.contract = null
     this.signer = null
+    this.provider = null
     this.contractAddress = null
-    this.ownerContract = null // Contract instance with owner's signer
+    this.ownerContract = null
+    this.oneInchApiKey = process.env.NEXT_PUBLIC_ONEINCH_API_KEY || null
+    
+    // Debug: Log API key status (without exposing the actual key)
+    console.log('🔧 TokenService initialized')
+    console.log('   1inch API Key:', this.oneInchApiKey ? 'Present ✅' : 'Not found ❌')
     
     // Contract ABI - this defines which functions we can call
     this.contractABI = [
@@ -35,6 +41,7 @@ export class TokenService {
       // Events
       "event Transfer(address indexed from, address indexed to, uint256 value)",
       "event Mint(address indexed to, uint256 amount, string reason)",
+      "event TokensSpent(address indexed user, uint256 amount, string item)",
       "event UserTransfer(address indexed from, address indexed to, uint256 amount, string message)"
     ]
   }
@@ -42,6 +49,8 @@ export class TokenService {
   // Initialize the service with wallet connection
   async initialize(provider, userAddress) {
     try {
+      // Store provider reference
+      this.provider = provider
       // Get signer properly for ethers v6
       this.signer = await provider.getSigner()
       this.userAddress = userAddress
@@ -71,6 +80,7 @@ export class TokenService {
         const deploymentInfo = await response.json()
         console.log('✅ Loaded contract address from deployment info:', deploymentInfo.contractAddress)
         console.log('📡 Network:', deploymentInfo.network, 'Chain ID:', deploymentInfo.chainId)
+        console.log('📡 Full deployment info:', deploymentInfo)
         return deploymentInfo.contractAddress
       } else {
         throw new Error('Deployment info file not found')
@@ -156,6 +166,8 @@ export class TokenService {
       if (result.success) {
         console.log('✅ Backend successfully minted tokens')
         console.log(`   Transaction: ${result.data.transactionHash}`)
+        console.log(`   Tokens earned: ${result.data.rewardTokens}`)
+        console.log(`   Block number: ${result.data.blockNumber}`)
         
         return {
           success: true,
@@ -170,6 +182,8 @@ export class TokenService {
       
     } catch (error) {
       console.error('❌ Frontend: Error requesting tokens from backend:', error)
+      console.error('   Error details:', error.message)
+      console.error('   Stack:', error.stack)
       return {
         success: false,
         error: error.message
@@ -188,15 +202,86 @@ export class TokenService {
     return rewardWei
   }
 
-  // Get user's current token balance
+  // Get user's current token balance using 1inch Balance API with fallback
   async getTokenBalance(address = null) {
-    if (!this.contract) {
-      throw new Error('Contract not initialized')
-    }
-
     const targetAddress = address || await this.signer.getAddress()
+    console.log('🔍 Getting balance for address:', targetAddress)
+    console.log('🔍 Contract address:', this.contractAddress)
+    
+    // Try 1inch Balance API first (faster and more reliable)
+    try {
+      const oneInchBalance = await this.getBalanceVia1inch(targetAddress)
+      if (oneInchBalance !== null) {
+        console.log('✅ Balance loaded via 1inch API:', oneInchBalance)
+        return ethers.parseEther(oneInchBalance)
+      }
+    } catch (error) {
+      console.warn('⚠️ 1inch API failed, falling back to direct contract call:', error.message)
+    }
+    
+    // Fallback to direct contract call
+    if (!this.contract) {
+      throw new Error('Contract not initialized and 1inch API unavailable')
+    }
+    
+    console.log('🔄 Using direct contract call fallback')
     const balanceWei = await this.contract.balanceOf(targetAddress)
+    console.log('🔍 Raw balance from contract (wei):', balanceWei.toString())
+    console.log('🔍 Formatted balance (ether):', this.formatTokenAmount(balanceWei))
+    
     return balanceWei
+  }
+
+  // Get balance using 1inch Balance API
+  async getBalanceVia1inch(userAddress) {
+    if (!this.contractAddress) {
+      throw new Error('Contract address not set')
+    }
+    
+    console.log('🌐 Fetching balance via 1inch API...')
+    console.log('   User address:', userAddress)
+    console.log('   Contract address:', this.contractAddress)
+    console.log('   Chain ID: 421614 (Arbitrum Sepolia)')
+    console.log('   API Key status:', this.oneInchApiKey ? 'Available ✅' : 'Missing ❌')
+    
+    const apiUrl = `https://api.1inch.dev/balance/v1.2/421614/balances/${userAddress}`
+    
+    const headers = {
+      'Accept': 'application/json'
+    }
+    
+    // Add API key if available
+    if (this.oneInchApiKey) {
+      headers['Authorization'] = `Bearer ${this.oneInchApiKey}`
+      console.log('🔑 Using API key for authenticated request')
+    } else {
+      console.log('🔓 Using public API (rate limited)')
+    }
+    
+    const response = await fetch(apiUrl, { headers })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ 1inch API error response:', response.status, errorText)
+      throw new Error(`1inch API error: ${response.status} - ${errorText}`)
+    }
+    
+    const data = await response.json()
+    console.log('📊 1inch API response:', data)
+    
+    // Extract SYBAU token balance from response
+    const tokenBalance = data[this.contractAddress.toLowerCase()] || data[this.contractAddress]
+    
+    if (tokenBalance === undefined) {
+      console.log('⚠️ SYBAU token not found in 1inch response, balance is 0')
+      return '0'
+    }
+    
+    // Convert from wei to ether format
+    const formattedBalance = ethers.formatEther(tokenBalance)
+    console.log('✅ SYBAU balance from 1inch:', formattedBalance)
+    
+    return formattedBalance
   }
 
   // Utility: Convert USD string to cents
@@ -291,8 +376,14 @@ export class TokenService {
       throw new Error('Contract not initialized')
     }
 
+    if (!this.provider) {
+      throw new Error('Provider not initialized')
+    }
+
     try {
       console.log('🔍 Loading real transaction history from blockchain...')
+      console.log('   User address:', userAddress)
+      console.log('   Contract address:', this.contractAddress)
       
       // Get all Transfer events for this user (both incoming and outgoing)
       const transferFilter = this.contract.filters.Transfer()
@@ -300,21 +391,24 @@ export class TokenService {
       const spentFilter = this.contract.filters.TokensSpent()
       const userTransferFilter = this.contract.filters.UserTransfer()
 
-      // Get events from recent blocks (last 10000 blocks)
-      const currentBlock = await this.contract.provider.getBlockNumber()
-      const fromBlock = Math.max(0, currentBlock - 10000)
-
-      console.log(`📊 Scanning blocks ${fromBlock} to ${currentBlock}...`)
+      // Get events from recent blocks (last 50000 blocks or from contract deployment)
+      const currentBlock = await this.provider.getBlockNumber()
+      const fromBlock = Math.max(0, currentBlock - 50000)
+      
+      console.log(`📊 Current block: ${currentBlock}, scanning from block: ${fromBlock}`)
+      console.log(`📊 Contract address: ${this.contractAddress}`)
 
       // Fetch all relevant events
+      console.log('📡 Fetching blockchain events...')
       const [transferEvents, mintEvents, spentEvents, userTransferEvents] = await Promise.all([
-        this.contract.queryFilter(transferFilter, fromBlock, currentBlock),
-        this.contract.queryFilter(mintFilter, fromBlock, currentBlock), 
-        this.contract.queryFilter(spentFilter, fromBlock, currentBlock),
-        this.contract.queryFilter(userTransferFilter, fromBlock, currentBlock)
+        this.contract.queryFilter(transferFilter, fromBlock, currentBlock).catch(e => { console.error('Transfer events error:', e); return []; }),
+        this.contract.queryFilter(mintFilter, fromBlock, currentBlock).catch(e => { console.error('Mint events error:', e); return []; }),
+        this.contract.queryFilter(spentFilter, fromBlock, currentBlock).catch(e => { console.error('Spent events error:', e); return []; }),
+        this.contract.queryFilter(userTransferFilter, fromBlock, currentBlock).catch(e => { console.error('UserTransfer events error:', e); return []; })
       ])
 
       console.log(`📝 Found ${transferEvents.length} transfers, ${mintEvents.length} mints, ${spentEvents.length} spends, ${userTransferEvents.length} user transfers`)
+      console.log(`📝 User address filter: ${userAddress.toLowerCase()}`)
 
       const transactions = []
 
@@ -325,6 +419,7 @@ export class TokenService {
         
         // Mint events (from address(0))
         if (from === ethers.ZeroAddress && to.toLowerCase() === userAddress.toLowerCase()) {
+          console.log(`🎯 Found mint event: ${this.formatTokenAmount(value)} tokens to ${to}`)
           transactions.push({
             id: `mint_${event.transactionHash}_${event.logIndex}`,
             type: 'mint',
@@ -406,7 +501,9 @@ export class TokenService {
       return sortedTransactions
 
     } catch (error) {
-      console.error('Error loading transaction history:', error)
+      console.error('❌ Error loading transaction history:', error)
+      console.error('   Error details:', error.message)
+      console.error('   Stack:', error.stack)
       return []
     }
   }

@@ -54,9 +54,10 @@ export default async function handler(req, res) {
 
     // 5. CALCULATE reward amount (1% of swap value)
     const rewardCents = Math.floor(swapAmountUSD * 100); // Convert to cents
+    const rewardTokens = swapAmountUSD / 100; // 1 SYBAU per $100 USD
 
     console.log('⚡ Backend: Minting tokens...');
-    console.log(`   Minting ${swapAmountUSD} SYBAU to ${userAddress}`);
+    console.log(`   Minting ${rewardTokens} SYBAU for $${swapAmountUSD} swap to ${userAddress}`);
 
     // 6. MINT tokens directly to user (single transaction)
     const tx = await contract.mintRewardForSwapSimple(userAddress, rewardCents);
@@ -71,7 +72,7 @@ export default async function handler(req, res) {
     await recordRewardTransaction({
       userAddress,
       swapAmountUSD,
-      rewardTokens: swapAmountUSD,
+      rewardTokens: rewardTokens,
       swapTransactionId,
       mintTransactionHash: tx.hash,
       timestamp: new Date().toISOString()
@@ -83,7 +84,7 @@ export default async function handler(req, res) {
       message: 'Tokens successfully minted',
       data: {
         userAddress,
-        rewardTokens: swapAmountUSD,
+        rewardTokens: rewardTokens,
         transactionHash: tx.hash,
         blockNumber: receipt.blockNumber,
         timestamp: new Date().toISOString()

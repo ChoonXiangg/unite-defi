@@ -16,6 +16,7 @@ export default function TokenTest() {
   const [error, setError] = useState('')
   const [walletConnected, setWalletConnected] = useState(false)
   const [userAddress, setUserAddress] = useState('')
+  const [dataLoading, setDataLoading] = useState(false)
   
   // Transfer states
   const [transferAddress, setTransferAddress] = useState('')
@@ -26,70 +27,142 @@ export default function TokenTest() {
   const [contractService, setContractService] = useState(null)
 
   useEffect(() => {
-    // Initialize real contract and check wallet connection
-    initializeRealContract()
+    // Check if wallet was previously connected
+    checkExistingConnection()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-load data whenever wallet connection changes
+  useEffect(() => {
+    if (walletConnected && userAddress) {
+      console.log('🔄 Wallet connected, auto-loading data...')
+      loadAllData()
+    }
+  }, [walletConnected, userAddress]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Check for existing wallet connection without prompting
+  const checkExistingConnection = async () => {
+    if (typeof window !== 'undefined' && window.ethereum) {
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' })
+        if (accounts.length > 0) {
+          console.log('🔗 Previously connected wallet found:', accounts[0])
+          setUserAddress(accounts[0])
+          setWalletConnected(true)
+          await setupContractService()
+        }
+      } catch (error) {
+        console.log('⚠️ Error checking existing connection:', error.message)
+      }
+    }
+  }
+
+  // Load all data (balance + history) automatically
+  const loadAllData = async () => {
+    if (!userAddress) return
+    
+    setDataLoading(true)
+    console.log('📊 Loading all user data automatically...')
+    try {
+      await Promise.all([
+        loadTokenBalance(),
+        loadRealTransactionHistory()
+      ])
+      console.log('✅ All data loaded successfully')
+    } catch (error) {
+      console.error('❌ Error loading data:', error)
+    } finally {
+      setDataLoading(false)
+    }
+  }
+
+  // Auto-reload data after transactions with delay
+  const autoReloadAfterTransaction = async () => {
+    console.log('🔄 Transaction completed, auto-reloading data in 3 seconds...')
+    await new Promise(resolve => setTimeout(resolve, 3000)) // Wait for blockchain confirmation
+    await loadAllData()
+  }
 
   // Load real transaction history from blockchain
   const loadRealTransactionHistory = async () => {
-    if (!contractService || !userAddress) return
+    if (!userAddress) return
     
     try {
-      console.log('🔍 Loading real transaction history from blockchain...')
-      const realTransactions = await contractService.getTransactionHistory(userAddress, 10)
+      console.log('🔍 Loading transaction history via API...')
       
-      // Convert blockchain transactions to display format
-      const displayTransactions = realTransactions.map(tx => {
-        switch (tx.type) {
-          case 'mint':
-            return {
-              id: tx.id,
-              type: 'mint',
-              tokensEarned: tx.tokensEarned,
-              usdAmount: (parseFloat(tx.tokensEarned) * 100).toString(), // Reverse calculate USD
-              txHash: tx.txHash,
-              timestamp: tx.timestamp
-            }
-          case 'spend':
-            return {
-              id: tx.id,
-              type: 'spend',
-              amountSpent: tx.amountSpent,
-              itemPurchased: tx.itemPurchased,
-              txHash: tx.txHash,
-              timestamp: tx.timestamp
-            }
-          case 'transfer_out':
-          case 'user_transfer':
-            return {
-              id: tx.id,
-              type: 'transfer',
-              amountTransferred: tx.amountTransferred,
-              recipient: tx.recipient,
-              message: tx.message || '',
-              txHash: tx.txHash,
-              timestamp: tx.timestamp
-            }
-          case 'receive':
-          case 'transfer_in':
-            return {
-              id: tx.id,
-              type: 'receive',
-              amountReceived: tx.amountReceived || tx.amountTransferred,
-              sender: tx.sender,
-              message: tx.message || '',
-              txHash: tx.txHash,
-              timestamp: tx.timestamp
-            }
-          default:
-            return null
-        }
-      }).filter(Boolean)
+      // Call our API endpoint that uses 1inch History API with fallback
+      const response = await fetch(`/api/get-history?userAddress=${userAddress}`)
+      const result = await response.json()
       
-      setTransactions(displayTransactions)
-      console.log(`✅ Loaded ${displayTransactions.length} real transactions from blockchain`)
+      if (result.success) {
+        console.log(`✅ History loaded via ${result.source}:`, result.transactions.length, 'transactions')
+        setTransactions(result.transactions)
+      } else {
+        throw new Error(result.error || 'Failed to get transaction history')
+      }
+      
     } catch (error) {
-      console.error('Failed to load transaction history:', error)
+      console.error('❌ Failed to load transaction history:', error)
+      
+      // Final fallback to contract service if available
+      if (contractService) {
+        try {
+          console.log('🔄 Using contract service fallback for history...')
+          const realTransactions = await contractService.getTransactionHistory(userAddress, 10)
+          
+          // Convert to display format
+          const displayTransactions = realTransactions.map(tx => {
+            switch (tx.type) {
+              case 'mint':
+                return {
+                  id: tx.id,
+                  type: 'mint',
+                  tokensEarned: tx.tokensEarned,
+                  txHash: tx.txHash,
+                  timestamp: tx.timestamp
+                }
+              case 'spend':
+                return {
+                  id: tx.id,
+                  type: 'spend',
+                  amountSpent: tx.amountSpent,
+                  itemPurchased: tx.itemPurchased,
+                  txHash: tx.txHash,
+                  timestamp: tx.timestamp
+                }
+              case 'transfer_out':
+                return {
+                  id: tx.id,
+                  type: 'transfer',
+                  amountTransferred: tx.amountTransferred,
+                  recipient: tx.recipient,
+                  message: tx.message || '',
+                  txHash: tx.txHash,
+                  timestamp: tx.timestamp
+                }
+              case 'transfer_in':
+                return {
+                  id: tx.id,
+                  type: 'receive',
+                  amountReceived: tx.amountTransferred,
+                  sender: tx.sender,
+                  message: tx.message || '',
+                  txHash: tx.txHash,
+                  timestamp: tx.timestamp
+                }
+              default:
+                return null
+            }
+          }).filter(Boolean)
+          
+          setTransactions(displayTransactions)
+          console.log(`✅ Contract service history: ${displayTransactions.length} transactions`)
+        } catch (contractError) {
+          console.error('❌ Contract service history also failed:', contractError)
+          setTransactions([])
+        }
+      } else {
+        setTransactions([])
+      }
     }
   }
 
@@ -128,9 +201,8 @@ export default function TokenTest() {
       
       if (initialized) {
         setContractService(tokenService)
-        await loadTokenBalance()
-        await loadRealTransactionHistory()
         console.log('✅ Real contract service initialized')
+        // Data will auto-load via useEffect when contractService is set
       } else {
         throw new Error('Failed to initialize contract service')
       }
@@ -176,6 +248,7 @@ export default function TokenTest() {
         setWalletConnected(true)
         await setupContractService()
         setError('')
+        // Data will auto-load via useEffect when walletConnected changes
       } catch (error) {
         setError('Failed to connect wallet. Make sure you have MetaMask installed and try adding the Hardhat network manually.')
       }
@@ -185,17 +258,45 @@ export default function TokenTest() {
   }
 
   const loadTokenBalance = async () => {
-    if (!contractService || !userAddress) return
+    if (!userAddress) {
+      console.log('⚠️ Cannot load balance: userAddress not available')
+      return
+    }
     
     try {
-      console.log('🔍 Loading real balance from blockchain...')
-      const balanceWei = await contractService.getTokenBalance(userAddress)
-      const formattedBalance = ethers.formatEther(balanceWei)
-      setTokenBalance(formattedBalance)
-      console.log(`✅ Real blockchain balance: ${formattedBalance} SYBAU`)
+      console.log('🔍 Loading SYBAU balance via API...')
+      console.log('🔍 User address:', userAddress)
+      
+      // Call our API endpoint that uses 1inch Balance API with fallback
+      const response = await fetch(`/api/get-balance?userAddress=${userAddress}`)
+      const result = await response.json()
+      
+      if (result.success) {
+        const formattedBalance = result.balance
+        console.log(`✅ Balance loaded via ${result.source}:`, formattedBalance, 'SYBAU')
+        setTokenBalance(formattedBalance)
+      } else {
+        throw new Error(result.error || 'Failed to get balance')
+      }
+      
     } catch (error) {
-      console.error('Failed to load balance:', error)
-      setTokenBalance('0')
+      console.error('❌ Failed to load balance:', error)
+      
+      // Final fallback to contract service if available
+      if (contractService) {
+        try {
+          console.log('🔄 Using contract service fallback...')
+          const balanceWei = await contractService.getTokenBalance(userAddress)
+          const formattedBalance = ethers.formatEther(balanceWei)
+          setTokenBalance(formattedBalance)
+          console.log(`✅ Balance from contract service: ${formattedBalance} SYBAU`)
+        } catch (contractError) {
+          console.error('❌ Contract service also failed:', contractError)
+          setTokenBalance('0')
+        }
+      } else {
+        setTokenBalance('0')
+      }
     }
   }
 
@@ -237,10 +338,9 @@ export default function TokenTest() {
       const result = await contractService.generateTokensForSwap(swapAmount)
       
       if (result.success) {
-        // Clear form and reload real data from blockchain
+        // Clear form and auto-reload data
         setSwapAmount('')
-        await loadTokenBalance()
-        await loadRealTransactionHistory() // Load fresh data from blockchain
+        await autoReloadAfterTransaction()
       } else {
         setError(result.error || 'Transaction failed')
       }
@@ -265,9 +365,8 @@ export default function TokenTest() {
       const result = await contractService.spendTokens(amount, itemName)
       
       if (result.success) {
-        // Reload real data from blockchain
-        await loadTokenBalance()
-        await loadRealTransactionHistory() // Load fresh data from blockchain
+        // Auto-reload data after transaction
+        await autoReloadAfterTransaction()
       } else {
         setError(result.error || 'Spending failed')
       }
@@ -302,14 +401,13 @@ export default function TokenTest() {
       const result = await contractService.transferToUser(transferAddress, transferAmount, transferMessage)
       
       if (result.success) {
-        // Reload real data from blockchain
-        await loadTokenBalance()
-        await loadRealTransactionHistory() // Load fresh data from blockchain
-        
         // Clear form
         setTransferAddress('')
         setTransferAmount('')
         setTransferMessage('')
+        
+        // Auto-reload data after transaction
+        await autoReloadAfterTransaction()
       } else {
         setError(result.error || 'Transfer failed')
       }
@@ -321,11 +419,11 @@ export default function TokenTest() {
     setIsLoading(false)
   }
 
-  const refreshBlockchainData = () => {
-    // Refresh all data from blockchain
+  const refreshBlockchainData = async () => {
+    // Manual refresh of all data
     setError('')
-    loadTokenBalance() // Refresh balance from blockchain
-    loadRealTransactionHistory() // Refresh transaction history from blockchain
+    console.log('🔄 Manual refresh requested...')
+    await loadAllData()
   }
 
   if (!walletConnected) {
@@ -438,10 +536,18 @@ export default function TokenTest() {
             <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 mb-6 border border-purple-200">
               <div className="text-center">
                 <p className="text-sm text-purple-600 mb-1">SYBAU Balance</p>
-                <p className="text-3xl font-bold text-purple-700 mb-1">{tokenBalance}</p>
-                <p className="text-xs text-purple-500">
-                  ≈ ${(parseFloat(tokenBalance) * 100).toFixed(2)} USD
-                </p>
+                {dataLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-3xl font-bold text-purple-700 mb-1">{tokenBalance}</p>
+                    <p className="text-xs text-purple-500">
+                      ≈ ${(parseFloat(tokenBalance) * 100).toFixed(2)} USD
+                    </p>
+                  </>
+                )}
                 <div className="mt-2 px-2 py-1 bg-purple-100 rounded-full text-xs text-purple-600">
                   {userAddress?.slice(0, 6)}...{userAddress?.slice(-4)}
                 </div>
@@ -547,9 +653,14 @@ export default function TokenTest() {
 
           {/* Transaction History */}
           <div className="bg-white rounded-lg shadow-xl p-6">
-            <h2 className="text-xl font-bold mb-4">📋 Test History</h2>
+            <h2 className="text-xl font-bold mb-4">📋 Transaction History</h2>
             
-            {transactions.length === 0 ? (
+            {dataLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600 mr-3"></div>
+                <span className="text-gray-600">Loading transactions...</span>
+              </div>
+            ) : transactions.length === 0 ? (
               <p className="text-gray-500 text-sm text-center py-8">
                 No transactions yet.<br/>
                 Start by generating some tokens!
