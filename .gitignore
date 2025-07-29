@@ -43,3 +43,6 @@ next-env.d.ts
 # Hardhat build artifacts
 artifacts/
 cache/
+
+# Claude configuration
+.claude

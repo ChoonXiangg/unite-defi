@@ -1,0 +1,13 @@
+{
+  "contractAddress": "0x176E38D94AD24022fDb813E8F3f3fe10Fde17249",
+  "name": "Unite DeFi NFT",
+  "symbol": "UNITE",
+  "description": "Unite DeFi NFT Collection",
+  "baseURI": "",
+  "owner": "0x7184B01a8A9ac24428bB8d3925701D151920C9Ce",
+  "network": "arbitrumSepolia",
+  "deployedAt": "2025-07-28T16:27:10.469Z",
+  "royaltyReceiver": "0x7184B01a8A9ac24428bB8d3925701D151920C9Ce",
+  "royaltyFeeBps": 500,
+  "totalSupply": 0
+}
