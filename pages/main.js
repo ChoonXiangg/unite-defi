@@ -39,14 +39,14 @@ export default function Main() {
   const [currentRate, setCurrentRate] = useState(null);
   const [gasData, setGasData] = useState(null);
 
-  // Backend-supported tokens with real logos
+  // Backend-supported tokens with CoinGecko logos
   const tokens = [
     { 
       symbol: "ETH", 
       name: "Ethereum", 
       chain: "Ethereum", 
       chainId: 1,
-      logo: "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
+      logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -54,7 +54,7 @@ export default function Main() {
       name: "Ethereum", 
       chain: "Arbitrum", 
       chainId: 42161,
-      logo: "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
+      logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -62,7 +62,7 @@ export default function Main() {
       name: "Ethereum", 
       chain: "Base", 
       chainId: 8453,
-      logo: "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
+      logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -70,7 +70,7 @@ export default function Main() {
       name: "USD Coin", 
       chain: "Ethereum", 
       chainId: 1,
-      logo: "https://tokens.1inch.io/0xa0b86a33e6441b8c2c8c0c0c4c8c0c4c8c0c4c8c.png",
+      logo: "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png",
       address: "0xA0b86a33E6441b8C4C8C0C4C8C0C4C8C0C4C8C0C"
     },
     { 
@@ -78,7 +78,7 @@ export default function Main() {
       name: "USD Coin", 
       chain: "Arbitrum", 
       chainId: 42161,
-      logo: "https://tokens.1inch.io/0xa0b86a33e6441b8c2c8c0c0c4c8c0c4c8c0c4c8c.png",
+      logo: "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png",
       address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
     },
     { 
@@ -86,7 +86,7 @@ export default function Main() {
       name: "USD Coin", 
       chain: "Polygon", 
       chainId: 137,
-      logo: "https://tokens.1inch.io/0xa0b86a33e6441b8c2c8c0c0c4c8c0c4c8c0c4c8c.png",
+      logo: "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png",
       address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
     },
     { 
@@ -94,7 +94,7 @@ export default function Main() {
       name: "Tether USD", 
       chain: "Ethereum", 
       chainId: 1,
-      logo: "https://tokens.1inch.io/0xdac17f958d2ee523a2206206994597c13d831ec7.png",
+      logo: "https://assets.coingecko.com/coins/images/325/small/Tether.png",
       address: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
     },
     { 
@@ -102,7 +102,7 @@ export default function Main() {
       name: "BNB", 
       chain: "BSC", 
       chainId: 56,
-      logo: "https://tokens.1inch.io/0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c.png",
+      logo: "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png",
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -110,7 +110,7 @@ export default function Main() {
       name: "Polygon", 
       chain: "Polygon", 
       chainId: 137,
-      logo: "https://tokens.1inch.io/0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0.png",
+      logo: "https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png",
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -118,7 +118,7 @@ export default function Main() {
       name: "Avalanche", 
       chain: "Avalanche", 
       chainId: 43114,
-      logo: "https://tokens.1inch.io/0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7.png",
+      logo: "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png",
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -143,37 +143,37 @@ export default function Main() {
     { 
       name: "Ethereum", 
       chainId: 1, 
-      logo: "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png",
+      logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
       rpc: "https://eth.llamarpc.com"
     },
     { 
       name: "Arbitrum", 
       chainId: 42161, 
-      logo: "https://bridge.arbitrum.io/logo.png",
+      logo: "https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg",
       rpc: "https://arb1.arbitrum.io/rpc"
     },
     { 
       name: "Base", 
       chainId: 8453, 
-      logo: "https://avatars.githubusercontent.com/u/108554348?s=280&v=4",
+      logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
       rpc: "https://mainnet.base.org"
     },
     { 
       name: "Polygon", 
       chainId: 137, 
-      logo: "https://tokens.1inch.io/0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0.png",
+      logo: "https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png",
       rpc: "https://polygon-rpc.com"
     },
     { 
       name: "BSC", 
       chainId: 56, 
-      logo: "https://tokens.1inch.io/0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c.png",
+      logo: "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png",
       rpc: "https://bsc-dataseed1.binance.org"
     },
     { 
       name: "Avalanche", 
       chainId: 43114, 
-      logo: "https://tokens.1inch.io/0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7.png",
+      logo: "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png",
       rpc: "https://api.avax.network/ext/bc/C/rpc"
     },
     { 
