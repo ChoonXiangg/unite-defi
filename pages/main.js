@@ -565,9 +565,20 @@ export default function Main() {
       {/* Dark Navbar */}
       <nav className="bg-gray-800/50 backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex justify-center items-center">
+          <div className="flex justify-between items-center">
+            {/* Portfolio Link - Left */}
+            <a 
+              href="/portfolio"
+              className="text-lg font-semibold text-gray-300 hover:text-white transition-colors"
+            >
+              Portfolio
+            </a>
+            
             {/* Logo/Title - Centered */}
-            <h1 className="text-4xl font-bold text-white">PegaSwap</h1>
+            <h1 className="text-4xl font-bold text-white absolute left-1/2 transform -translate-x-1/2">PegaSwap</h1>
+            
+            {/* Empty space for balance */}
+            <div></div>
           </div>
         </div>
       </nav>
