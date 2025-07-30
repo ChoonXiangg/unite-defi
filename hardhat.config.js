@@ -27,7 +27,8 @@ module.exports = {
     arbitrumSepolia: {
       url: "https://sepolia-rollup.arbitrum.io/rpc",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      chainId: 421614
+      chainId: 421614,
+      gasPrice: 1000000000, // 1 gwei (low gas for testnet)
     },
     // Etherlink Networks
     etherlink: {

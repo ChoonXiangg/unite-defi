@@ -5,7 +5,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IFlashLoanReceiver.sol";
 import "./interfaces/IWETH.sol";
-import "./SepoliaConfig.sol";
+import "./interfaces/I1inchLimitOrderProtocol.sol";
+import "./ArbitrumConfig.sol";
 
 /**
  * @title GasStationExtension
@@ -32,6 +33,9 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
     IPool public immutable AAVE_POOL;
     address public immutable WETH;
     
+    // 1inch Limit Order Protocol
+    I1inchLimitOrderProtocol public immutable INCH_LOP;
+    
     struct FlashLoanParams {
         bytes32 orderHash1;
         bytes32 orderHash2;
@@ -48,10 +52,11 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
      * @param _aavePool Custom Aave pool address (use address(0) for Sepolia default)
      * @param _weth Custom WETH address (use address(0) for Sepolia default)
      */
-    constructor(address _aavePool, address _weth) Ownable(msg.sender) {
+    constructor(address _aavePool, address _weth, address _inch) Ownable(msg.sender) {
         // Use ternary operators to initialize immutable variables
-        AAVE_POOL = IPool(_aavePool == address(0) ? SepoliaConfig.AAVE_POOL : _aavePool);
-        WETH = _weth == address(0) ? SepoliaConfig.WETH : _weth;
+        AAVE_POOL = IPool(_aavePool == address(0) ? ArbitrumConfig.AAVE_POOL : _aavePool);
+        WETH = _weth == address(0) ? ArbitrumConfig.WETH : _weth;
+        INCH_LOP = I1inchLimitOrderProtocol(_inch == address(0) ? ArbitrumConfig.get1inchLOP() : _inch);
         
         emit GasStationInitialized(msg.sender);
     }
@@ -163,7 +168,7 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
         flashLoanActive[batchId] = true;
         
         // Determine if we need to handle native ETH
-        bool useNativeETH = SepoliaConfig.isNativeETH(token1) || SepoliaConfig.isNativeETH(token2);
+        bool useNativeETH = ArbitrumConfig.isNativeETH(token1) || ArbitrumConfig.isNativeETH(token2);
         
         // Prepare flash loan parameters
         FlashLoanParams memory params = FlashLoanParams({
@@ -291,17 +296,17 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
      */
     function _isValidToken(address token) internal view returns (bool) {
         // Allow native ETH
-        if (SepoliaConfig.isNativeETH(token)) {
+        if (ArbitrumConfig.isNativeETH(token)) {
             return true;
         }
         
-        // Allow WETH (both Sepolia config and current contract WETH)
-        if (token == WETH || token == SepoliaConfig.WETH) {
+        // Allow WETH (both Arbitrum config and current contract WETH)
+        if (token == WETH || token == ArbitrumConfig.WETH) {
             return true;
         }
         
-        // Allow other Sepolia supported assets
-        return SepoliaConfig.isSupportedAsset(token);
+        // Allow other Arbitrum supported assets
+        return ArbitrumConfig.isSupportedAsset(token);
     }
     
     /**
@@ -309,11 +314,11 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
      * @return tokens Array of supported token addresses
      */
     function getSupportedTokens() external pure returns (address[] memory tokens) {
-        address[] memory configTokens = SepoliaConfig.getSupportedTokens();
+        address[] memory configTokens = ArbitrumConfig.getSupportedTokens();
         tokens = new address[](configTokens.length + 1);
         
         // Add native ETH (address(0)) as first option
-        tokens[0] = SepoliaConfig.getNativeETH();
+        tokens[0] = ArbitrumConfig.getNativeETH();
         
         // Add all ERC20 tokens from config
         for (uint i = 0; i < configTokens.length; i++) {
@@ -355,7 +360,7 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
     function rescueTokens(address token, uint256 amount, address recipient) external onlyOwner {
         require(recipient != address(0), "Invalid recipient");
         
-        if (SepoliaConfig.isNativeETH(token)) {
+        if (ArbitrumConfig.isNativeETH(token)) {
             require(address(this).balance >= amount, "Insufficient ETH balance");
             payable(recipient).transfer(amount);
         } else {
