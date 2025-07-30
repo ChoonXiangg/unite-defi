@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     }
 
     const contractAddress = '0x032CdA4d263385dDe296C6C288B56A750CcCF047';
-    const apiKey = process.env.NEXT_PUBLIC_ONEINCH_API_KEY;
+    const apiKey = process.env.ONEINCH_API_KEY;
     
     console.log('📜 Getting transaction history via 1inch API...');
     console.log('   User:', userAddress);

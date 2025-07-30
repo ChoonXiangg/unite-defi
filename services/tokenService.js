@@ -10,7 +10,7 @@ export class TokenService {
     this.provider = null
     this.contractAddress = null
     this.ownerContract = null
-    this.oneInchApiKey = process.env.NEXT_PUBLIC_ONEINCH_API_KEY || null
+    this.oneInchApiKey = process.env.ONEINCH_API_KEY || null
     
     // Debug: Log API key status (without exposing the actual key)
     console.log('🔧 TokenService initialized')
