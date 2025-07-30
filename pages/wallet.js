@@ -12,6 +12,13 @@ export default function Wallet() {
   const [editLabel, setEditLabel] = useState('');
   const [showPrivateKey, setShowPrivateKey] = useState(null);
   const [refreshInterval, setRefreshInterval] = useState(null);
+  
+  // New state for additional features
+  const [showMnemonic, setShowMnemonic] = useState(null);
+  const [showAddresses, setShowAddresses] = useState(null);
+  const [showTokens, setShowTokens] = useState(null);
+  const [walletTokens, setWalletTokens] = useState(null);
+  const [loadingTokens, setLoadingTokens] = useState(false);
 
   useEffect(() => {
     loadWallets();
@@ -321,6 +328,92 @@ export default function Wallet() {
     setShowPrivateKey(null);
   };
 
+  // New functions for additional features
+  const viewMnemonic = async (walletId) => {
+    const walletPassword = prompt('Enter wallet password to view mnemonic phrase:');
+    if (!walletPassword) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/wallet/mnemonic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletId, password: walletPassword })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setShowMnemonic({
+          walletId,
+          mnemonic: data.mnemonic,
+          warning: data.warning
+        });
+      } else {
+        alert('Failed to retrieve mnemonic: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error viewing mnemonic: ' + error.message);
+    }
+    setLoading(false);
+  };
+
+  const hideMnemonic = () => {
+    setShowMnemonic(null);
+  };
+
+  const viewAddresses = async (walletId) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/wallet/addresses?walletId=${walletId}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setShowAddresses(data);
+      } else {
+        alert('Failed to retrieve addresses: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error viewing addresses: ' + error.message);
+    }
+    setLoading(false);
+  };
+
+  const hideAddresses = () => {
+    setShowAddresses(null);
+  };
+
+  const viewTokens = async (walletId) => {
+    const wallet = wallets.find(w => w.id === walletId);
+    if (!wallet) {
+      alert('Wallet not found');
+      return;
+    }
+
+    setLoadingTokens(true);
+    try {
+      const response = await fetch(`/api/wallet/tokens?walletAddress=${wallet.metadata.evmAddress}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setWalletTokens(data);
+        setShowTokens({
+          walletId,
+          walletAddress: wallet.metadata.evmAddress
+        });
+      } else {
+        alert('Failed to retrieve tokens: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error viewing tokens: ' + error.message);
+    }
+    setLoadingTokens(false);
+  };
+
+  const hideTokens = () => {
+    setShowTokens(null);
+    setWalletTokens(null);
+  };
+
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1>Unite DeFi Wallet</h1>
@@ -423,6 +516,24 @@ export default function Wallet() {
                       style={{ marginRight: '10px', backgroundColor: '#ffc107', color: 'black' }}
                     >
                       View Private Key
+                    </button>
+                    <button 
+                      onClick={() => viewMnemonic(wallet.id)}
+                      style={{ marginRight: '10px', backgroundColor: '#28a745', color: 'white' }}
+                    >
+                      View Mnemonic
+                    </button>
+                    <button 
+                      onClick={() => viewAddresses(wallet.id)}
+                      style={{ marginRight: '10px', backgroundColor: '#17a2b8', color: 'white' }}
+                    >
+                      View Addresses
+                    </button>
+                    <button 
+                      onClick={() => viewTokens(wallet.id)}
+                      style={{ marginRight: '10px', backgroundColor: '#6f42c1', color: 'white' }}
+                    >
+                      View ERC20 Tokens
                     </button>
                     <button 
                       onClick={() => deleteWallet(wallet.id)}
@@ -540,6 +651,320 @@ export default function Wallet() {
             
             <button 
               onClick={hidePrivateKey}
+              style={{ 
+                backgroundColor: '#007bff', 
+                color: 'white', 
+                padding: '10px 20px',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mnemonic Modal */}
+      {showMnemonic && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.7)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '30px', 
+            borderRadius: '10px',
+            maxWidth: '600px',
+            width: '90%'
+          }}>
+            <h3>🔐 Mnemonic Phrase</h3>
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ color: 'red', fontWeight: 'bold' }}>{showMnemonic.warning}</p>
+            </div>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <label><strong>Recovery Phrase:</strong></label>
+              <div style={{ 
+                backgroundColor: '#f8f9fa', 
+                border: '1px solid #ddd', 
+                padding: '15px', 
+                borderRadius: '5px',
+                wordBreak: 'break-all',
+                fontFamily: 'monospace',
+                fontSize: '14px',
+                lineHeight: '1.6'
+              }}>
+                {showMnemonic.mnemonic}
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#fff3cd', border: '1px solid #ffecb5', borderRadius: '5px' }}>
+              <p style={{ margin: 0, fontSize: '12px' }}>
+                📝 <strong>Important:</strong> Write down this phrase and store it safely. You'll need it to recover your wallet.
+              </p>
+            </div>
+            
+            <button 
+              onClick={hideMnemonic}
+              style={{ 
+                backgroundColor: '#007bff', 
+                color: 'white', 
+                padding: '10px 20px',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Addresses Modal */}
+      {showAddresses && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.7)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '30px', 
+            borderRadius: '10px',
+            maxWidth: '800px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto'
+          }}>
+            <h3>📍 Wallet Addresses</h3>
+            
+            {/* EVM Address Section */}
+            <div style={{ marginBottom: '25px' }}>
+              <h4 style={{ color: '#007bff', marginBottom: '15px' }}>🔷 EVM Address (Ethereum Compatible)</h4>
+              <div style={{ 
+                backgroundColor: '#f8f9fa', 
+                border: '1px solid #ddd', 
+                padding: '10px', 
+                borderRadius: '5px',
+                wordBreak: 'break-all',
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                marginBottom: '10px'
+              }}>
+                {showAddresses.addresses.evm.address}
+              </div>
+              
+              <h5>Supported Networks:</h5>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {showAddresses.addresses.evm.networks.map((network, index) => (
+                  <div key={index} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: '8px',
+                    backgroundColor: '#f0f8ff',
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }}>
+                    <span><strong>{network.name}</strong> ({network.symbol})</span>
+                    <a href={network.explorer} target="_blank" rel="noopener noreferrer" 
+                       style={{ color: '#007bff', textDecoration: 'none' }}>
+                      View on Explorer ↗
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Tezos Address Section */}
+            <div style={{ marginBottom: '25px' }}>
+              <h4 style={{ color: '#28a745', marginBottom: '15px' }}>🔶 Tezos Address</h4>
+              <div style={{ 
+                backgroundColor: '#f8f9fa', 
+                border: '1px solid #ddd', 
+                padding: '10px', 
+                borderRadius: '5px',
+                wordBreak: 'break-all',
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                marginBottom: '10px'
+              }}>
+                {showAddresses.addresses.tezos.address}
+              </div>
+              
+              <h5>Supported Networks:</h5>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {showAddresses.addresses.tezos.networks.map((network, index) => (
+                  <div key={index} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: '8px',
+                    backgroundColor: '#f0fff0',
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }}>
+                    <span><strong>{network.name}</strong> ({network.symbol})</span>
+                    <a href={network.explorer} target="_blank" rel="noopener noreferrer" 
+                       style={{ color: '#28a745', textDecoration: 'none' }}>
+                      View on Explorer ↗
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <button 
+              onClick={hideAddresses}
+              style={{ 
+                backgroundColor: '#007bff', 
+                color: 'white', 
+                padding: '10px 20px',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tokens Modal */}
+      {showTokens && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.7)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '30px', 
+            borderRadius: '10px',
+            maxWidth: '900px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto'
+          }}>
+            <h3>🪙 ERC20 Tokens</h3>
+            
+            {loadingTokens ? (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <p>🔄 Scanning networks for tokens...</p>
+              </div>
+            ) : walletTokens ? (
+              <div>
+                <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#e7f3ff', borderRadius: '5px' }}>
+                  <p style={{ margin: 0, fontSize: '14px' }}>
+                    📊 <strong>Summary:</strong> Found {walletTokens.summary.totalTokensFound} tokens across {walletTokens.summary.totalNetworks} networks
+                  </p>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                    Wallet: {walletTokens.walletAddress}
+                  </p>
+                </div>
+                
+                {Object.entries(walletTokens.networks).map(([networkKey, networkData]) => (
+                  <div key={networkKey} style={{ marginBottom: '20px' }}>
+                    <h4 style={{ color: '#6f42c1', marginBottom: '10px' }}>
+                      🌐 {networkData.network} {networkData.chainId && `(Chain ID: ${networkData.chainId})`}
+                    </h4>
+                    
+                    {networkData.error ? (
+                      <div style={{ 
+                        padding: '10px', 
+                        backgroundColor: '#f8d7da', 
+                        border: '1px solid #f5c6cb', 
+                        borderRadius: '5px',
+                        color: '#721c24'
+                      }}>
+                        ❌ Error: {networkData.error}
+                      </div>
+                    ) : networkData.tokens && networkData.tokens.length > 0 ? (
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        {networkData.tokens.map((token, index) => (
+                          <div key={index} style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center',
+                            padding: '12px',
+                            backgroundColor: token.type === 'native' ? '#fff3cd' : '#f0f8ff',
+                            border: '1px solid ' + (token.type === 'native' ? '#ffecb5' : '#bee5eb'),
+                            borderRadius: '5px',
+                            fontSize: '14px'
+                          }}>
+                            <div>
+                              <div style={{ fontWeight: 'bold' }}>
+                                {token.type === 'native' ? '🔹' : '🪙'} {token.symbol}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#666' }}>
+                                {token.name}
+                              </div>
+                              {token.contractAddress && token.contractAddress !== 'native' && (
+                                <div style={{ fontSize: '10px', color: '#999', fontFamily: 'monospace' }}>
+                                  {token.contractAddress.slice(0, 10)}...{token.contractAddress.slice(-8)}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontWeight: 'bold', color: '#28a745' }}>
+                                {parseFloat(token.balance).toFixed(6)}
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#666' }}>
+                                {token.type === 'native' ? 'Native' : 'ERC-20'}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ 
+                        padding: '15px', 
+                        backgroundColor: '#f8f9fa', 
+                        border: '1px solid #dee2e6', 
+                        borderRadius: '5px',
+                        textAlign: 'center',
+                        color: '#6c757d'
+                      }}>
+                        No tokens found on this network
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <p>No token data available</p>
+              </div>
+            )}
+            
+            <button 
+              onClick={hideTokens}
               style={{ 
                 backgroundColor: '#007bff', 
                 color: 'white', 
