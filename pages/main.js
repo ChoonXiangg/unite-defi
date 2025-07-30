@@ -12,6 +12,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Empty Glassmorphism Box Component
+const LeaderboardCard = () => {
+  return (
+    <div className="relative w-full">
+      <div className="relative bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-purple-600/20 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 hover:scale-[1.02] h-28">
+        
+        {/* Glowing border effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-400/30 via-pink-400/30 to-purple-500/30 rounded-2xl blur-sm -z-10 opacity-60"></div>
+        
+      </div>
+    </div>
+  );
+};
+
 export default function Main() {
   const [fromToken, setFromToken] = useState("ETH");
   const [toToken, setToToken] = useState("USDC");
@@ -426,8 +440,8 @@ export default function Main() {
 
       <div className="max-w-7xl mx-auto p-4">
         <div className="flex gap-4">
-          {/* Left Side - Swap Interface - More to the left */}
-          <div className="flex-shrink-0 -ml-16">
+          {/* Left Side - Swap Interface and Leaderboard */}
+          <div className="flex-shrink-0 -ml-16 space-y-0">
             <div className="bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-700 scale-85 w-[572px] min-w-[572px] max-w-[572px]">
               
               {/* Pay Section */}
@@ -746,6 +760,11 @@ export default function Main() {
               >
                 Swap
               </button>
+            </div>
+            
+            {/* Leaderboard Card underneath swap UI */}
+            <div className="scale-85 w-[572px] min-w-[572px] max-w-[572px]">
+              <LeaderboardCard />
             </div>
           </div>
 
