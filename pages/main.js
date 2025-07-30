@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { Geist, Geist_Mono } from "next/font/google";
 import { useState, useEffect } from "react";
+import { WalletService, oneInchUtils } from "../utils/walletUtils";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,13 @@ export default function Main() {
   const [gasEstimate, setGasEstimate] = useState(null);
   const [currentRate, setCurrentRate] = useState(null);
   const [gasData, setGasData] = useState(null);
+
+  // Wallet states
+  const [walletService] = useState(() => new WalletService());
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState(null);
+  const [swapping, setSwapping] = useState(false);
+  const [swapStatus, setSwapStatus] = useState(null);
 
   // Backend-supported tokens with CoinGecko logos
   const tokens = [
@@ -237,8 +245,120 @@ export default function Main() {
     return null;
   };
 
-  const handleSwap = () => {
-    console.log(`Swapping ${fromAmount} ${fromToken} to ${toToken}`);
+  // Wallet connection function
+  const connectWallet = async () => {
+    try {
+      const { address } = await walletService.connectWallet();
+      setWalletConnected(true);
+      setWalletAddress(address);
+      setSwapStatus('Wallet connected successfully!');
+      setTimeout(() => setSwapStatus(null), 3000);
+    } catch (error) {
+      console.error('Wallet connection failed:', error);
+      setSwapStatus(`Connection failed: ${error.message}`);
+      setTimeout(() => setSwapStatus(null), 5000);
+    }
+  };
+
+  // Enhanced swap function with 1inch integration
+  const handleSwap = async () => {
+    if (!walletConnected) {
+      await connectWallet();
+      return;
+    }
+
+    if (!fromAmount || !toAmount || parseFloat(fromAmount) <= 0) {
+      setSwapStatus('Please enter a valid amount');
+      setTimeout(() => setSwapStatus(null), 3000);
+      return;
+    }
+
+    setSwapping(true);
+    setSwapStatus('Preparing swap...');
+
+    try {
+      // Get token data
+      const fromTokenData = tokens.find(t => t.symbol === fromToken);
+      const toTokenData = tokens.find(t => t.symbol === toToken);
+
+      if (!fromTokenData || !toTokenData) {
+        throw new Error('Token configuration not found');
+      }
+
+      // Add decimals to token data if not present
+      const fromTokenWithDecimals = {
+        ...fromTokenData,
+        decimals: getTokenDecimals(fromToken)
+      };
+      const toTokenWithDecimals = {
+        ...toTokenData,
+        decimals: getTokenDecimals(toToken)
+      };
+
+      setSwapStatus('Building swap transaction...');
+
+      // Build swap transaction using 1inch
+      const swapData = await oneInchUtils.buildSwapData(
+        fromTokenWithDecimals,
+        toTokenWithDecimals,
+        fromAmount,
+        walletAddress,
+        fromTokenData.chainId
+      );
+
+      if (!swapData.success) {
+        throw new Error(swapData.error || 'Failed to build swap transaction');
+      }
+
+      // Check if token approval is needed (skip for native tokens)
+      if (fromTokenData.address !== '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE') {
+        setSwapStatus('Checking token allowance...');
+        
+        const routerAddress = oneInchUtils.getRouterAddress(fromTokenData.chainId);
+        const requiredAmount = oneInchUtils.toSmallestUnit(fromAmount, fromTokenWithDecimals.decimals);
+        const allowance = await walletService.checkTokenAllowance(
+          fromTokenData.address,
+          routerAddress,
+          fromTokenData.chainId
+        );
+
+        if (allowance < requiredAmount) {
+          setSwapStatus('Approving token spend...');
+          const approveTx = await walletService.approveToken(
+            fromTokenData.address,
+            routerAddress,
+            requiredAmount
+          );
+          
+          setSwapStatus('Waiting for approval confirmation...');
+          await approveTx.wait();
+        }
+      }
+
+      setSwapStatus('Executing swap...');
+
+      // Execute the swap
+      const swapTx = await walletService.executeSwap(swapData.transaction);
+      
+      setSwapStatus('Waiting for swap confirmation...');
+      const receipt = await swapTx.wait();
+
+      setSwapStatus('Swap completed successfully! 🎉');
+      console.log('Swap completed:', receipt);
+
+      // Reset form
+      setFromAmount('');
+      setToAmount('');
+      
+      setTimeout(() => setSwapStatus(null), 5000);
+
+    } catch (error) {
+      console.error('Swap failed:', error);
+      setSwapStatus(`Swap failed: ${error.message}`);
+      setTimeout(() => setSwapStatus(null), 8000);
+    } finally {
+      setSwapping(false);
+    }
   };
 
   // Bidirectional calculation
@@ -357,6 +477,24 @@ export default function Main() {
     return num.toString();
   };
 
+  const getTokenDecimals = (symbol) => {
+    const decimals = {
+      ETH: 18,
+      WETH: 18,
+      USDC: 6,
+      USDT: 6,
+      DAI: 18,
+      WBTC: 8,
+      BNB: 18,
+      MATIC: 18,
+      AVAX: 18,
+      XTZ: 6,
+      kUSD: 18
+    };
+    
+    return decimals[symbol.toUpperCase()] || 18;
+  };
+
   const validateAndFormatInput = (value) => {
     // Only allow numbers and decimal point
     let cleanValue = value.replace(/[^0-9.]/g, '');
@@ -392,6 +530,21 @@ export default function Main() {
     fetchPrices(tokenSymbols);
     fetchGasData();
     
+    // Check if wallet is already connected
+    const checkWalletConnection = async () => {
+      if (window.ethereum && window.ethereum.selectedAddress) {
+        try {
+          const { address } = await walletService.connectWallet();
+          setWalletConnected(true);
+          setWalletAddress(address);
+        } catch (error) {
+          console.log('Wallet auto-connection failed:', error);
+        }
+      }
+    };
+    
+    checkWalletConnection();
+    
     // Refresh prices every 30 seconds and gas data every 60 seconds
     const priceInterval = setInterval(() => {
       fetchPrices(tokenSymbols);
@@ -405,7 +558,7 @@ export default function Main() {
       clearInterval(priceInterval);
       clearInterval(gasInterval);
     };
-  }, []);
+  }, [walletService]);
 
   return (
     <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen bg-gray-900`}>
@@ -424,8 +577,13 @@ export default function Main() {
         {/* Wallet Address Box */}
         <div className="bg-gray-700/80 backdrop-blur-sm rounded-lg px-4 py-2 border border-gray-600 shadow-sm">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <span className="text-sm font-mono text-gray-300">0x1234...5678</span>
+            <div className={`w-2 h-2 rounded-full ${walletConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-sm font-mono text-gray-300">
+              {walletConnected 
+                ? `${walletAddress?.slice(0, 6)}...${walletAddress?.slice(-4)}`
+                : 'Not Connected'
+              }
+            </span>
           </div>
         </div>
         
@@ -753,12 +911,33 @@ export default function Main() {
                 </div>
               </div>
 
+              {/* Swap Status Display */}
+              {swapStatus && (
+                <div className="bg-blue-500/20 border border-blue-400/30 rounded-xl p-3 mb-4">
+                  <div className="text-center text-blue-300 text-sm font-medium">
+                    {swapStatus}
+                  </div>
+                </div>
+              )}
+
               {/* Swap Button */}
               <button
                 onClick={handleSwap}
-                className="w-full bg-pink-600 hover:bg-pink-500 text-white py-4 px-6 rounded-xl font-bold text-lg transition-colors shadow-lg"
+                disabled={swapping}
+                className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-colors shadow-lg ${
+                  swapping 
+                    ? 'bg-gray-600 cursor-not-allowed text-gray-300' 
+                    : walletConnected
+                      ? 'bg-pink-600 hover:bg-pink-500 text-white'
+                      : 'bg-blue-600 hover:bg-blue-500 text-white'
+                }`}
               >
-                Swap
+                {swapping 
+                  ? 'Processing...' 
+                  : walletConnected 
+                    ? 'Swap' 
+                    : 'Connect Wallet'
+                }
               </button>
             </div>
             
