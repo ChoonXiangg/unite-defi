@@ -39,10 +39,10 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
     struct FlashLoanParams {
         bytes32 orderHash1;
         bytes32 orderHash2;
-        address maker1;
-        address maker2;
-        address token1; // Token that maker1 is offering
-        address token2; // Token that maker2 is offering
+        I1inchLimitOrderProtocol.Order order1;
+        I1inchLimitOrderProtocol.Order order2;
+        bytes signature1;
+        bytes signature2;
         uint256 estimatedGasUsed;
         bool useNativeETH; // True if dealing with native ETH instead of WETH
     }
@@ -130,32 +130,36 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
     }
     
     /**
-     * @dev Initiate flash loan for gasless swap execution
-     * @param orderHash1 First order hash
-     * @param orderHash2 Second order hash (counterpart)
-     * @param maker1 First order maker address
-     * @param maker2 Second order maker address
-     * @param token1 Token that maker1 is offering (use address(0) for native ETH)
-     * @param token2 Token that maker2 is offering (use address(0) for native ETH)
+     * @dev Execute paired orders with flash loan for gasless swaps
+     * @param order1 First 1inch limit order
+     * @param signature1 Signature for first order
+     * @param order2 Second 1inch limit order
+     * @param signature2 Signature for second order
      * @param estimatedGasUsed Estimated gas for both swaps
      */
-    function initiateFlashLoanSwap(
-        bytes32 orderHash1,
-        bytes32 orderHash2,
-        address maker1,
-        address maker2,
-        address token1,
-        address token2,
+    function executePairedOrders(
+        I1inchLimitOrderProtocol.Order calldata order1,
+        bytes calldata signature1,
+        I1inchLimitOrderProtocol.Order calldata order2,
+        bytes calldata signature2,
         uint256 estimatedGasUsed
     ) external onlyOwner nonReentrant {
+        // Validate orders
+        bytes32 orderHash1 = INCH_LOP.hashOrder(order1);
+        bytes32 orderHash2 = INCH_LOP.hashOrder(order2);
+        
         require(isOrderPairReady(orderHash1), "Order pair not ready");
         require(orderPairs[orderHash1] == orderHash2, "Invalid order pair");
-        require(maker1 != address(0) && maker2 != address(0), "Invalid maker addresses");
+        require(order1.maker != address(0) && order2.maker != address(0), "Invalid maker addresses");
         require(estimatedGasUsed > 0, "Invalid gas estimate");
         
+        // Validate signatures
+        require(INCH_LOP.isValidSignature(order1, signature1), "Invalid signature for order1");
+        require(INCH_LOP.isValidSignature(order2, signature2), "Invalid signature for order2");
+        
         // Validate tokens are supported
-        require(_isValidToken(token1), "Token1 not supported");
-        require(_isValidToken(token2), "Token2 not supported");
+        require(_isValidToken(order1.makerAsset), "Order1 maker asset not supported");
+        require(_isValidToken(order2.makerAsset), "Order2 maker asset not supported");
         
         bytes32 batchId = keccak256(abi.encodePacked(orderHash1, orderHash2, block.timestamp));
         require(!flashLoanActive[batchId], "Flash loan already active for this batch");
@@ -168,16 +172,16 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
         flashLoanActive[batchId] = true;
         
         // Determine if we need to handle native ETH
-        bool useNativeETH = ArbitrumConfig.isNativeETH(token1) || ArbitrumConfig.isNativeETH(token2);
+        bool useNativeETH = ArbitrumConfig.isNativeETH(order1.makerAsset) || ArbitrumConfig.isNativeETH(order2.makerAsset);
         
         // Prepare flash loan parameters
         FlashLoanParams memory params = FlashLoanParams({
             orderHash1: orderHash1,
             orderHash2: orderHash2,
-            maker1: maker1,
-            maker2: maker2,
-            token1: token1,
-            token2: token2,
+            order1: order1,
+            order2: order2,
+            signature1: signature1,
+            signature2: signature2,
             estimatedGasUsed: estimatedGasUsed,
             useNativeETH: useNativeETH
         });
@@ -234,10 +238,16 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
             IWETH(assets[0]).withdraw(amounts[0]);
         }
         
-        // TODO: Execute the actual swaps here (will be implemented in next feature)
-        // For now, just emit an event to track execution with token info
-        emit FeesCollected(flashParams.token1, amounts[0]);
-        emit FeesCollected(flashParams.token2, amounts[0]);
+        // Execute both 1inch limit orders atomically
+        try this._executeBothOrders(flashParams) {
+            // Orders executed successfully
+            emit FeesCollected(flashParams.order1.makerAsset, amounts[0]);
+            emit FeesCollected(flashParams.order2.makerAsset, amounts[0]);
+        } catch Error(string memory reason) {
+            // If orders fail, we still need to repay the flash loan
+            // This would typically revert the entire transaction
+            revert(string(abi.encodePacked("Order execution failed: ", reason)));
+        }
         
         // Handle native ETH conversion back if needed
         if (flashParams.useNativeETH) {
@@ -262,6 +272,42 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
         return true;
     }
     
+    /**
+     * @dev Internal function to execute both 1inch orders
+     * @param params Flash loan parameters containing both orders
+     */
+    function _executeBothOrders(FlashLoanParams memory params) external {
+        require(msg.sender == address(this), "Only self-call allowed");
+        
+        // Execute first order
+        (uint256 actualMaking1, uint256 actualTaking1) = INCH_LOP.fillOrder(
+            params.order1,
+            params.signature1,
+            bytes(""), // No interaction data
+            params.order1.makingAmount,
+            params.order1.takingAmount,
+            0 // No skip permit
+        );
+        
+        // Execute second order
+        (uint256 actualMaking2, uint256 actualTaking2) = INCH_LOP.fillOrder(
+            params.order2,
+            params.signature2,
+            bytes(""), // No interaction data
+            params.order2.makingAmount,
+            params.order2.takingAmount,
+            0 // No skip permit
+        );
+        
+        // Verify orders were filled as expected
+        require(actualMaking1 > 0 && actualTaking1 > 0, "Order1 execution failed");
+        require(actualMaking2 > 0 && actualTaking2 > 0, "Order2 execution failed");
+        
+        // Mark order pair as completed
+        completedPairs[params.orderHash1] = true;
+        completedPairs[params.orderHash2] = true;
+    }
+
     /**
      * @dev Check if flash loan is active for a batch
      * @param batchId Batch identifier
@@ -369,6 +415,48 @@ contract GasStationExtension is Ownable, ReentrancyGuard, IFlashLoanReceiver {
         }
     }
     
+    /**
+     * @dev Validate a 1inch limit order
+     * @param order Order to validate
+     * @param signature Order signature
+     * @return bool True if order is valid
+     */
+    function validateOrder(
+        I1inchLimitOrderProtocol.Order calldata order,
+        bytes calldata signature
+    ) external view returns (bool) {
+        // Check signature validity
+        if (!INCH_LOP.isValidSignature(order, signature)) {
+            return false;
+        }
+        
+        // Check if order has remaining amount
+        bytes32 orderHash = INCH_LOP.hashOrder(order);
+        if (INCH_LOP.remaining(orderHash) == 0) {
+            return false;
+        }
+        
+        // Check if assets are supported
+        if (!_isValidToken(order.makerAsset) || !_isValidToken(order.takerAsset)) {
+            return false;
+        }
+        
+        // Check predicate if exists
+        if (!INCH_LOP.checkPredicate(order)) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * @dev Get 1inch Limit Order Protocol address
+     * @return address 1inch LOP contract address
+     */
+    function get1inchLOP() external view returns (address) {
+        return address(INCH_LOP);
+    }
+
     /**
      * @dev Get contract version for upgrades
      * @return string Version string
