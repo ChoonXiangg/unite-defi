@@ -19,6 +19,10 @@ export default function Wallet() {
   const [showTokens, setShowTokens] = useState(null);
   const [walletTokens, setWalletTokens] = useState(null);
   const [loadingTokens, setLoadingTokens] = useState(false);
+  
+  // Private key import state
+  const [privateKey, setPrivateKey] = useState('');
+  const [keyType, setKeyType] = useState('evm');
 
   useEffect(() => {
     loadWallets();
@@ -116,6 +120,52 @@ export default function Wallet() {
         alert('Wallet imported successfully!');
         setPassword('');
         setMnemonic('');
+        loadWallets();
+      } else {
+        if (response.status === 409) {
+          // Wallet already exists
+          alert(`Cannot import wallet: ${data.error}\n\nExisting wallet created: ${new Date(data.existingWallet.createdAt).toLocaleString()}`);
+        } else {
+          alert('Failed to import wallet: ' + data.error);
+        }
+      }
+    } catch (error) {
+      alert('Error importing wallet: ' + error.message);
+    }
+    setLoading(false);
+  };
+
+  const importWalletFromPrivateKey = async () => {
+    if (!password || !privateKey) {
+      alert('Password and private key are required');
+      return;
+    }
+
+    if (password.length < 8) {
+      alert('Password must be at least 8 characters long');
+      return;
+    }
+
+    const username = prompt('Enter a username for this wallet (optional):') || '';
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/wallet/import-private-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          privateKey, 
+          password, 
+          keyType,
+          metadata: { username }
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert(`Wallet imported successfully from ${keyType.toUpperCase()} private key!\n\nEVM Address: ${data.addresses.evm}\nTezos Address: ${data.addresses.tezos}\n\nNote: ${data.note}`);
+        setPassword('');
+        setPrivateKey('');
         loadWallets();
       } else {
         if (response.status === 409) {
@@ -433,7 +483,7 @@ export default function Wallet() {
       </div>
 
       <div style={{ marginBottom: '30px' }}>
-        <h2>Import Wallet</h2>
+        <h2>Import Wallet from Mnemonic</h2>
         <input
           type="password"
           placeholder="Enter password"
@@ -449,8 +499,44 @@ export default function Wallet() {
           style={{ marginRight: '10px', padding: '5px', width: '300px' }}
         />
         <button onClick={importWallet} disabled={loading}>
-          Import Wallet
+          Import from Mnemonic
         </button>
+      </div>
+
+      <div style={{ marginBottom: '30px' }}>
+        <h2>Import Wallet from Private Key</h2>
+        <div style={{ marginBottom: '10px' }}>
+          <input
+            type="password"
+            placeholder="Enter password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{ marginRight: '10px', padding: '5px' }}
+          />
+          <select
+            value={keyType}
+            onChange={(e) => setKeyType(e.target.value)}
+            style={{ marginRight: '10px', padding: '5px' }}
+          >
+            <option value="evm">EVM (Ethereum Compatible)</option>
+            <option value="tezos">Tezos</option>
+          </select>
+        </div>
+        <div style={{ marginBottom: '10px' }}>
+          <input
+            type="password"
+            placeholder="Enter private key"
+            value={privateKey}
+            onChange={(e) => setPrivateKey(e.target.value)}
+            style={{ marginRight: '10px', padding: '5px', width: '400px' }}
+          />
+          <button onClick={importWalletFromPrivateKey} disabled={loading}>
+            Import from Private Key
+          </button>
+        </div>
+        <p style={{ fontSize: '12px', color: '#666', margin: '5px 0' }}>
+          💡 <strong>Note:</strong> When importing from {keyType.toUpperCase()} private key, a separate {keyType === 'evm' ? 'Tezos' : 'EVM'} wallet will be generated automatically.
+        </p>
       </div>
 
       <div style={{ marginBottom: '30px' }}>
