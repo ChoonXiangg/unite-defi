@@ -884,8 +884,8 @@
       "artifacts": []
     },
     "C:\\Users\\User\\unite-defi\\contracts\\UniteRewardToken.sol": {
-      "lastModificationDate": 1753790931907,
-      "contentHash": "22e8988f736d2fb002ca9009fc6af61f",
+      "lastModificationDate": 1753967822245,
+      "contentHash": "4b1d35a1db8973cfe274de1a8bf82a4f",
       "sourceName": "contracts/UniteRewardToken.sol",
       "solcConfig": {
         "version": "0.8.20",

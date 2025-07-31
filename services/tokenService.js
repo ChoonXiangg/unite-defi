@@ -25,9 +25,17 @@ export class TokenService {
       "function totalSupply() view returns (uint256)",
       "function balanceOf(address) view returns (uint256)",
       
-      // Token generation functions
+      // Token generation functions with dynamic pricing
       "function mintRewardForSwapSimple(address to, uint256 usdCents)",
       "function calculateReward(uint256 usdCents) view returns (uint256)",
+      
+      // Dynamic pricing functions
+      "function getPricingInfo() view returns (uint256, uint256, uint256, uint256, uint256)",
+      "function simulateTotalSupply(uint256 targetUsdSwapped) view returns (uint256)",
+      "function totalUsdSwapped() view returns (uint256)",
+      "function currentPriceMultiplier() view returns (uint256)",
+      "function halveningCount() view returns (uint256)",
+      "function manualHalvening()",
       
       // Spending and transfer functions
       "function spendTokens(uint256 amount, string memory itemName)",
@@ -42,7 +50,9 @@ export class TokenService {
       "event Transfer(address indexed from, address indexed to, uint256 value)",
       "event Mint(address indexed to, uint256 amount, string reason)",
       "event TokensSpent(address indexed user, uint256 amount, string item)",
-      "event UserTransfer(address indexed from, address indexed to, uint256 amount, string message)"
+      "event UserTransfer(address indexed from, address indexed to, uint256 amount, string message)",
+      "event Halvening(uint256 indexed halveningNumber, uint256 newPriceMultiplier, uint256 totalUsdSwapped)",
+      "event SwapProcessed(address indexed user, uint256 usdAmount, uint256 tokensEarned, uint256 currentMultiplier)"
     ]
   }
 
@@ -191,7 +201,7 @@ export class TokenService {
     }
   }
 
-  // Preview how many tokens user would get (without actually minting)
+  // Preview how many tokens user would get (without actually minting) using dynamic pricing
   async previewReward(usdAmount) {
     if (!this.contract) {
       throw new Error('Contract not initialized')
@@ -200,6 +210,51 @@ export class TokenService {
     const usdCents = this.usdToCents(usdAmount)
     const rewardWei = await this.contract.calculateReward(usdCents)
     return rewardWei
+  }
+
+  // Get current dynamic pricing information
+  async getPricingInfo() {
+    if (!this.contract) {
+      throw new Error('Contract not initialized')
+    }
+
+    try {
+      const [currentMultiplier, totalSwapped, nextHalveningAt, halvenings, tokensPerDollar] = 
+        await this.contract.getPricingInfo()
+      
+      return {
+        currentPriceMultiplier: currentMultiplier.toString(),
+        totalUsdSwapped: this.formatTokenAmount(totalSwapped), // Convert from wei to readable USD
+        nextHalveningAt: this.formatTokenAmount(nextHalveningAt),
+        halveningCount: halvenings.toString(),
+        tokensPerDollar: this.formatTokenAmount(tokensPerDollar),
+        currentRate: `1 PGS = $${Number(currentMultiplier).toFixed(2)}`,
+        progress: {
+          current: this.formatTokenAmount(totalSwapped),
+          target: this.formatTokenAmount(nextHalveningAt),
+          percentage: (Number(this.formatTokenAmount(totalSwapped)) / Number(this.formatTokenAmount(nextHalveningAt)) * 100).toFixed(2)
+        }
+      }
+    } catch (error) {
+      console.error('Error getting pricing info:', error)
+      throw error
+    }
+  }
+
+  // Simulate what total supply would be after certain USD amount is swapped
+  async simulateTotalSupply(targetUsdAmount) {
+    if (!this.contract) {
+      throw new Error('Contract not initialized')
+    }
+
+    try {
+      const targetUsdWei = ethers.parseEther(targetUsdAmount.toString())
+      const estimatedSupply = await this.contract.simulateTotalSupply(targetUsdWei)
+      return this.formatTokenAmount(estimatedSupply)
+    } catch (error) {
+      console.error('Error simulating total supply:', error)
+      throw error
+    }
   }
 
   // Get user's current token balance using 1inch Balance API with fallback

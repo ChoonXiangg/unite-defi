@@ -25,6 +25,9 @@ export default function TokenTest() {
 
   // Real contract service instance
   const [contractService, setContractService] = useState(null)
+  
+  // Dynamic pricing state
+  const [pricingInfo, setPricingInfo] = useState(null)
 
   useEffect(() => {
     // Check if wallet was previously connected
@@ -65,7 +68,8 @@ export default function TokenTest() {
     try {
       await Promise.all([
         loadTokenBalance(),
-        loadRealTransactionHistory()
+        loadRealTransactionHistory(),
+        loadPricingInfo()
       ])
       console.log('✅ All data loaded successfully')
     } catch (error) {
@@ -300,6 +304,23 @@ export default function TokenTest() {
     }
   }
 
+  const loadPricingInfo = async () => {
+    if (!contractService) {
+      console.log('⚠️ Cannot load pricing info: contractService not available')
+      return
+    }
+    
+    try {
+      console.log('🔍 Loading dynamic pricing info...')
+      const pricingData = await contractService.getPricingInfo()
+      setPricingInfo(pricingData)
+      console.log('✅ Pricing info loaded:', pricingData)
+    } catch (error) {
+      console.error('❌ Failed to load pricing info:', error)
+      setPricingInfo(null)
+    }
+  }
+
   const updateRewardPreview = async () => {
     if (!swapAmount || !contractService) {
       setPreviewReward('0')
@@ -318,6 +339,13 @@ export default function TokenTest() {
   useEffect(() => {
     updateRewardPreview()
   }, [swapAmount, contractService]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load pricing info when contract service changes
+  useEffect(() => {
+    if (contractService) {
+      loadPricingInfo()
+    }
+  }, [contractService]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSimulateSwap = async () => {
     if (!swapAmount || parseFloat(swapAmount) <= 0) {
@@ -489,7 +517,13 @@ export default function TokenTest() {
             <h2 className="text-xl font-bold mb-4">💱 Token Generator</h2>
             <p className="text-gray-600 mb-6 text-sm">
               Test the token reward calculation<br/>
-              <span className="font-semibold text-purple-600">Rate: $100 USD = 1.0 PGS</span>
+              {pricingInfo ? (
+                <span className="font-semibold text-purple-600">
+                  Current Rate: {pricingInfo.currentRate}
+                </span>
+              ) : (
+                <span className="font-semibold text-gray-400">Loading pricing...</span>
+              )}
             </p>
 
             <div className="space-y-4">
@@ -513,7 +547,11 @@ export default function TokenTest() {
                     Will generate: <span className="font-bold">{previewReward} PGS</span>
                   </p>
                   <p className="text-xs text-green-600 mt-1">
-                    Calculation: ${swapAmount} ÷ 100 = {previewReward} tokens
+                    {pricingInfo ? (
+                      <>Calculation: ${swapAmount} ÷ ${Number(pricingInfo.currentPriceMultiplier).toFixed(0)} = {previewReward} tokens</>
+                    ) : (
+                      <>Calculation: ${swapAmount} → {previewReward} tokens</>
+                    )}
                   </p>
                 </div>
               )}
@@ -683,7 +721,7 @@ export default function TokenTest() {
                         </p>
                         <p className="text-gray-600">On {tx.itemPurchased}</p>
                       </div>
-                    ) : tx.type === 'transfer' ? (
+                    ) : tx.type === 'transfer' || tx.type === 'transfer_out' ? (
                       <div className="text-sm">
                         <p className="font-semibold text-blue-600">
                           🔄 Sent {tx.amountTransferred} PGS
@@ -693,7 +731,7 @@ export default function TokenTest() {
                           <p className="text-gray-500 text-xs italic">&quot;{tx.message}&quot;</p>
                         )}
                       </div>
-                    ) : tx.type === 'receive' ? (
+                    ) : tx.type === 'receive' || tx.type === 'transfer_in' ? (
                       <div className="text-sm">
                         <p className="font-semibold text-purple-600">
                           📥 Received {tx.amountReceived} PGS

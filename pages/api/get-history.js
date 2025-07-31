@@ -11,7 +11,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'userAddress parameter required' });
     }
 
-    const contractAddress = '0x032CdA4d263385dDe296C6C288B56A750CcCF047';
+    const contractAddress = '0xaB74B313Ec82c5A201d564f9f9D564bF8266A83E';
     const apiKey = process.env.ONEINCH_API_KEY;
     
     console.log('📜 Getting transaction history via 1inch API...');

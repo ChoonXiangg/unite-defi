@@ -54,11 +54,24 @@ async function main() {
   console.log(`   Owner: ${owner}`);
   console.log(`   Minter: ${minter}`);
   
-  // Test the reward calculation function
-  console.log("🧮 Testing reward calculation...");
+  // Test the reward calculation function with dynamic pricing
+  console.log("🧮 Testing dynamic pricing system...");
+  
+  // Get current pricing info
+  const [currentMultiplier, totalSwapped, nextHalveningAt, halvenings, tokensPerDollar] = 
+    await pgsToken.getPricingInfo();
+  
+  console.log("📊 Dynamic Pricing Status:");
+  console.log(`   Current rate: 1 PGS = $${(Number(currentMultiplier) / 100).toFixed(2)}`);
+  console.log(`   Total USD swapped: $${ethers.formatEther(totalSwapped)}`);
+  console.log(`   Next halvening at: $${ethers.formatEther(nextHalveningAt)}`);
+  console.log(`   Halvenings completed: ${halvenings.toString()}`);
+  console.log(`   Tokens per $1: ${ethers.formatEther(tokensPerDollar)}`);
+  
+  // Test reward calculation
   const testUsdCents = 10000; // $100.00
   const expectedReward = await pgsToken.calculateReward(testUsdCents);
-  console.log(`   $100 swap = ${ethers.formatEther(expectedReward)} ${tokenSymbol} tokens`);
+  console.log(`   $100 swap = ${ethers.formatEther(expectedReward)} ${tokenSymbol} tokens (at current rate)`);
   
   // Save deployment info for frontend integration  
   const deploymentInfo = {
@@ -72,22 +85,40 @@ async function main() {
     deploymentTimestamp: new Date().toISOString(),
     deploymentBlockNumber: (await ethers.provider.getBlockNumber()).toString(),
     contractABI: [
-      // Essential ABI for frontend integration
+      // Essential ABI for frontend integration with dynamic pricing
       "function name() view returns (string)",
       "function symbol() view returns (string)", 
       "function decimals() view returns (uint8)",
       "function totalSupply() view returns (uint256)",
       "function balanceOf(address) view returns (uint256)",
+      
+      // Token generation with dynamic pricing
       "function mintRewardForSwapSimple(address to, uint256 usdCents)",
       "function calculateReward(uint256 usdCents) view returns (uint256)",
+      
+      // Dynamic pricing functions
+      "function getPricingInfo() view returns (uint256, uint256, uint256, uint256, uint256)",
+      "function simulateTotalSupply(uint256 targetUsdSwapped) view returns (uint256)",
+      "function totalUsdSwapped() view returns (uint256)",
+      "function currentPriceMultiplier() view returns (uint256)",
+      "function halveningCount() view returns (uint256)",
+      "function manualHalvening()",
+      
+      // Token usage functions
       "function spendTokens(uint256 amount, string memory itemName)",
       "function transferToUser(address to, uint256 amount, string memory message)",
+      
+      // Access control
       "function owner() view returns (address)",
       "function minter() view returns (address)",
       "function setMinter(address newMinter)",
+      
+      // Events
       "event Transfer(address indexed from, address indexed to, uint256 value)",
       "event Mint(address indexed to, uint256 amount, string reason)",
-      "event UserTransfer(address indexed from, address indexed to, uint256 amount, string message)"
+      "event UserTransfer(address indexed from, address indexed to, uint256 amount, string message)",
+      "event Halvening(uint256 indexed halveningNumber, uint256 newPriceMultiplier, uint256 totalUsdSwapped)",
+      "event SwapProcessed(address indexed user, uint256 usdAmount, uint256 tokensEarned, uint256 currentMultiplier)"
     ]
   };
   
@@ -110,7 +141,9 @@ async function main() {
   console.log(`Network: ${network.name}`);
   console.log(`Token: ${tokenName} (${tokenSymbol})`);
   console.log(`Owner/Minter: ${deployer.address}`);
-  console.log(`Reward Rate: $100 = 1.0 ${tokenSymbol}`);
+  console.log(`Initial Rate: 1 PGS = $${(Number(currentMultiplier) / 100).toFixed(2)}`);
+  console.log(`Dynamic Pricing: ✅ Enabled`);
+  console.log(`Supply Control: ✅ Approaching ~2000 PGS`);
   
   if (network.name === "localhost" || network.chainId === 31337n) {
     console.log("\n🔧 Next Steps for Local Testing:");
