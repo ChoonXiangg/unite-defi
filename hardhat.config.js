@@ -20,9 +20,10 @@ module.exports = {
       gasPrice: 20000000000, // 20 gwei
     },
     arbitrum: {
-      url: "https://arb1.arbitrum.io/rpc",
+      url: process.env.ARBITRUM_MAINNET_RPC_URL || "https://arbitrum-one.publicnode.com",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      chainId: 42161
+      chainId: 42161,
+      gasPrice: 100000000, // 0.1 gwei (typical for Arbitrum)
     },
     arbitrumSepolia: {
       url: "https://sepolia-rollup.arbitrum.io/rpc",
@@ -31,6 +32,12 @@ module.exports = {
       gasPrice: 1000000000, // 1 gwei (low gas for testnet)
     },
     // Etherlink Networks
+    polygon: {
+      url: "https://polygon-rpc.com",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 137,
+      gasPrice: 30000000000, // 30 gwei (typical for Polygon)
+    },
     etherlink: {
       url: "https://node.mainnet.etherlink.com",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
@@ -50,7 +57,9 @@ module.exports = {
   },
   etherscan: {
     apiKey: {
-      sepolia: process.env.ETHERSCAN_API_KEY || ""
+      sepolia: process.env.ETHERSCAN_API_KEY || "",
+      polygon: process.env.POLYGONSCAN_API_KEY || "",
+      arbitrumOne: process.env.ARBISCAN_API_KEY || ""
     }
   }
 };

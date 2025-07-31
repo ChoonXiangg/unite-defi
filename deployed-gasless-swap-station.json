@@ -1,0 +1,32 @@
+{
+  "contractAddress": "0xeE615abF49135BEB549c158d22245951FA12ED2d",
+  "name": "GaslessSwapStation",
+  "description": "Truly gasless token swaps using 1inch + meta-transactions",
+  "version": "2.0.0-gasless",
+  "owner": "0x7184B01a8A9ac24428bB8d3925701D151920C9Ce",
+  "network": "arbitrum-mainnet",
+  "chainId": "42161",
+  "deployedAt": "2025-07-31T12:28:10.167Z",
+  "blockNumber": 363491714,
+  "txHash": "0xb1c48521e66dc0bfffc2a123b99742111b752af0cd385a36984297c1cca62257",
+  "gasUsed": "2407968",
+  "deploymentCost": "0.00002407968 ETH",
+  "infrastructure": {
+    "inchLOP": "0x111111125421cA6dc452d289314280a0f8842A65",
+    "eip712Domain": "GaslessSwapStation",
+    "domainVersion": "1"
+  },
+  "features": {
+    "feeBasisPoints": 10,
+    "maxGasPrice": "10 gwei",
+    "metaTransactions": true,
+    "gaslessSwaps": true,
+    "flashLoanEnabled": false,
+    "eip712Signing": true
+  },
+  "links": {
+    "explorer": "https://arbiscan.io/address/0xeE615abF49135BEB549c158d22245951FA12ED2d",
+    "bridge": "https://bridge.arbitrum.io/",
+    "inch": "https://app.1inch.io/#/42161/swap/ETH/USDC"
+  }
+}

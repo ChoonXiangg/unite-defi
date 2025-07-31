@@ -1,0 +1,35 @@
+{
+  "contractAddress": "0x4a901a3502CE630dB4a3d7C5B264676E4f7C9649",
+  "name": "GaslessSwapStationV4",
+  "description": "Gasless token swaps using Uniswap V3 (reliable and battle-tested)",
+  "version": "4.0.0-uniswap-v3",
+  "owner": "0x7184B01a8A9ac24428bB8d3925701D151920C9Ce",
+  "network": "arbitrum-mainnet",
+  "chainId": "42161",
+  "deployedAt": "2025-07-31T18:43:03.974Z",
+  "blockNumber": 363581811,
+  "txHash": "0x2963530970654c5e7a4d865e9f83922678429ee807b66d9024bf77b4c0d5a8d2",
+  "gasUsed": "2227735",
+  "deploymentCost": "0.00002227735 ETH",
+  "infrastructure": {
+    "uniswapV3Router": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+    "weth": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+    "eip712Domain": "GaslessSwapStation",
+    "domainVersion": "4"
+  },
+  "features": {
+    "feeBasisPoints": 10,
+    "maxGasPrice": "20 gwei",
+    "metaTransactions": true,
+    "gaslessSwaps": true,
+    "uniswapV3": true,
+    "multipleFeeTeirs": true,
+    "emergencyPause": true,
+    "eip712Signing": true,
+    "deepLiquidity": true
+  },
+  "links": {
+    "explorer": "https://arbiscan.io/address/0x4a901a3502CE630dB4a3d7C5B264676E4f7C9649",
+    "uniswap": "https://app.uniswap.org/#/swap?chain=arbitrum"
+  }
+}
