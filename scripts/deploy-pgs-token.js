@@ -62,7 +62,7 @@ async function main() {
     await pgsToken.getPricingInfo();
   
   console.log("📊 Dynamic Pricing Status:");
-  console.log(`   Current rate: 1 PGS = $${(Number(currentMultiplier) / 100).toFixed(2)}`);
+  console.log(`   Current rate: 1 PGS = $${Number(currentMultiplier).toFixed(2)}`);
   console.log(`   Total USD swapped: $${ethers.formatEther(totalSwapped)}`);
   console.log(`   Next halvening at: $${ethers.formatEther(nextHalveningAt)}`);
   console.log(`   Halvenings completed: ${halvenings.toString()}`);
@@ -112,6 +112,9 @@ async function main() {
       "function owner() view returns (address)",
       "function minter() view returns (address)",
       "function setMinter(address newMinter)",
+      "function paused() view returns (bool)",
+      "function pause()",
+      "function unpause()",
       
       // Events
       "event Transfer(address indexed from, address indexed to, uint256 value)",
@@ -141,7 +144,7 @@ async function main() {
   console.log(`Network: ${network.name}`);
   console.log(`Token: ${tokenName} (${tokenSymbol})`);
   console.log(`Owner/Minter: ${deployer.address}`);
-  console.log(`Initial Rate: 1 PGS = $${(Number(currentMultiplier) / 100).toFixed(2)}`);
+  console.log(`Initial Rate: 1 PGS = $${Number(currentMultiplier).toFixed(2)}`);
   console.log(`Dynamic Pricing: ✅ Enabled`);
   console.log(`Supply Control: ✅ Approaching ~2000 PGS`);
   

@@ -21,6 +21,7 @@ contract UniteRewardToken {
     // Access control
     address public owner;           // Contract owner (can change minter)
     address public minter;          // Address that can mint new tokens (our backend)
+    bool public paused = false;     // Emergency pause mechanism
     
     // Dynamic pricing variables
     uint256 public totalUsdSwapped;        // Total USD swapped across all users (in wei format)
@@ -45,6 +46,11 @@ contract UniteRewardToken {
     
     modifier onlyMinter() {
         require(msg.sender == minter || msg.sender == owner, "Not authorized to mint");
+        _;
+    }
+    
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
         _;
     }
     
@@ -75,7 +81,7 @@ contract UniteRewardToken {
     // Only the minter (our app backend) can call this
     // usdAmount should be in wei format (18 decimals) for precision
     // Example: $100.50 = 100.5 * 10^18 = 100500000000000000000
-    function mintRewardForSwap(address to, uint256 usdAmount) external onlyMinter {
+    function mintRewardForSwap(address to, uint256 usdAmount) external onlyMinter whenNotPaused {
         require(to != address(0), "Cannot mint to zero address");
         require(usdAmount > 0, "USD amount must be positive");
         
@@ -96,6 +102,7 @@ contract UniteRewardToken {
             }
             
             // Calculate tokens for this phase using current multiplier
+            require(currentPriceMultiplier > 0, "Invalid price multiplier");
             uint256 tokensThisPhase = usdThisPhase / currentPriceMultiplier;
             totalRewardTokens += tokensThisPhase;
             
@@ -106,6 +113,7 @@ contract UniteRewardToken {
             // Check if we need to trigger halvening
             if (currentTotalSwapped >= nextHalveningAt) {
                 halveningCount++;
+                require(currentPriceMultiplier <= type(uint256).max / 2, "Price multiplier overflow");
                 currentPriceMultiplier *= 2;
                 emit Halvening(halveningCount, currentPriceMultiplier, currentTotalSwapped);
             }
@@ -128,7 +136,7 @@ contract UniteRewardToken {
     
     // Helper function for frontend: accepts USD as regular decimal number with dynamic pricing
     // Example: mintRewardForSwapSimple(userAddress, 10050) for $100.50
-    function mintRewardForSwapSimple(address to, uint256 usdCents) external onlyMinter {
+    function mintRewardForSwapSimple(address to, uint256 usdCents) external onlyMinter whenNotPaused {
         require(to != address(0), "Cannot mint to zero address");
         require(usdCents > 0, "USD amount must be positive");
         
@@ -152,6 +160,7 @@ contract UniteRewardToken {
             }
             
             // Calculate tokens for this phase using current multiplier
+            require(currentPriceMultiplier > 0, "Invalid price multiplier");
             uint256 tokensThisPhase = usdThisPhase / currentPriceMultiplier;
             totalRewardTokens += tokensThisPhase;
             
@@ -162,6 +171,7 @@ contract UniteRewardToken {
             // Check if we need to trigger halvening
             if (currentTotalSwapped >= nextHalveningAt) {
                 halveningCount++;
+                require(currentPriceMultiplier <= type(uint256).max / 2, "Price multiplier overflow");
                 currentPriceMultiplier *= 2;
                 emit Halvening(halveningCount, currentPriceMultiplier, currentTotalSwapped);
             }
@@ -251,9 +261,19 @@ contract UniteRewardToken {
     // Emergency function to manually trigger halvening (only owner)
     function manualHalvening() external onlyOwner {
         halveningCount++;
+        require(currentPriceMultiplier <= type(uint256).max / 2, "Price multiplier overflow");
         currentPriceMultiplier *= 2;
         
         emit Halvening(halveningCount, currentPriceMultiplier, totalUsdSwapped);
+    }
+    
+    // Emergency pause/unpause functions
+    function pause() external onlyOwner {
+        paused = true;
+    }
+    
+    function unpause() external onlyOwner {
+        paused = false;
     }
     
     // Function to simulate total supply after certain USD amount is swapped
