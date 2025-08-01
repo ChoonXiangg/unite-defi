@@ -564,48 +564,58 @@ export default function Main() {
     <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen bg-gray-900`}>
       {/* Dark Navbar */}
       <nav className="bg-gray-800/50 backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex justify-between items-center">
-            {/* Portfolio Link - Left */}
-            <a 
-              href="/portfolio"
-              className="text-lg font-semibold text-gray-300 hover:text-white transition-colors"
-            >
-              Portfolio
-            </a>
+        <div className="max-w-full px-8 py-6">
+          <div className="flex items-center justify-between h-12">
+            {/* Left side - Title and Nav Links */}
+            <div className="flex items-center gap-8">
+              {/* Title */}
+              <h1 
+                onClick={() => window.location.href = '/main'}
+                className="text-4xl font-bold text-white cursor-pointer hover:text-gray-200 transition-colors"
+              >
+                PegaSwap
+              </h1>
+              
+              {/* Navigation Links */}
+              <div className="flex items-center gap-6">
+                <a 
+                  href="/portfolio"
+                  className="text-lg font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200"
+                >
+                  Portfolio
+                </a>
+                <span className="text-lg font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 cursor-pointer">
+                  NFT
+                </span>
+              </div>
+            </div>
             
-            {/* Logo/Title - Centered */}
-            <h1 className="text-4xl font-bold text-white absolute left-1/2 transform -translate-x-1/2">PegaSwap</h1>
-            
-            {/* Empty space for balance */}
-            <div></div>
+            {/* Wallet & Settings - Right */}
+            <div className="flex items-center gap-4">
+              {/* Wallet Address Box */}
+              <div className="bg-gray-700/80 backdrop-blur-sm rounded-lg px-4 py-2 border border-gray-600 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${walletConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-sm font-mono text-gray-300">
+                    {walletConnected 
+                      ? `${walletAddress?.slice(0, 6)}...${walletAddress?.slice(-4)}`
+                      : 'Not Connected'
+                    }
+                  </span>
+                </div>
+              </div>
+              
+              {/* Settings Icon */}
+              <button className="bg-gray-700/80 backdrop-blur-sm rounded-lg p-2 border border-gray-600 shadow-sm hover:bg-gray-600/90 transition-colors">
+                <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </nav>
-
-      {/* Wallet & Settings - Absolute positioned in top right */}
-      <div className="fixed top-6 right-8 flex items-center gap-4 z-50">
-        {/* Wallet Address Box */}
-        <div className="bg-gray-700/80 backdrop-blur-sm rounded-lg px-4 py-2 border border-gray-600 shadow-sm">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${walletConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className="text-sm font-mono text-gray-300">
-              {walletConnected 
-                ? `${walletAddress?.slice(0, 6)}...${walletAddress?.slice(-4)}`
-                : 'Not Connected'
-              }
-            </span>
-          </div>
-        </div>
-        
-        {/* Settings Icon */}
-        <button className="bg-gray-700/80 backdrop-blur-sm rounded-lg p-2 border border-gray-600 shadow-sm hover:bg-gray-600/90 transition-colors">
-          <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
-      </div>
 
       <div className="max-w-7xl mx-auto p-4">
         <div className="flex gap-4">
@@ -953,17 +963,24 @@ export default function Main() {
             </div>
             
             {/* Leaderboard Card underneath swap UI */}
-            <div className="scale-85 w-[572px] min-w-[572px] max-w-[572px]">
-              <LeaderboardCard />
+            <div className="scale-85 w-[572px] min-w-[572px] max-w-[572px] -mt-8">
+              <div className="relative w-full">
+                <div className="relative bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-purple-600/20 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-2xl h-28">
+                  
+                  {/* Glowing border effect */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-400/30 via-pink-400/30 to-purple-500/30 rounded-2xl blur-sm -z-10 opacity-60"></div>
+                  
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Right Side - Picture - More to the right */}
           <div className="w-2/3 flex items-center justify-end mr-16">
             <img 
-              src="/pegaswap-pic.png" 
+              src="/default.png" 
               alt="PegaSwap" 
-              className="max-w-full h-auto object-contain scale-105"
+              className="max-w-full h-auto object-contain scale-[142.5%] transition-transform duration-300 hover:scale-150"
             />
           </div>
         </div>
