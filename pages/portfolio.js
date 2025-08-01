@@ -134,9 +134,24 @@ export default function Portfolio() {
   const totalValue = portfolio.reduce((sum, token) => sum + token.value, 0);
 
   return (
-    <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen bg-gray-900`}>
-      {/* Dark Navbar */}
-      <nav className="bg-gray-800/50 backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
+    <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen relative`} style={{
+      background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)',
+      backgroundSize: '200% 200%',
+      animation: 'gradientShift 6s ease-in-out infinite alternate'
+    }}>
+      <style jsx>{`
+        @keyframes gradientShift {
+          0% {
+            background: radial-gradient(ellipse at 20% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
+          }
+          100% {
+            background: radial-gradient(ellipse at 80% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
+          }
+        }
+      `}</style>
+      
+      {/* Navbar with same styling as swap UI */}
+      <nav className="bg-gray-800/90 backdrop-blur-md border-b border-gray-600/50 sticky top-0 z-50 shadow-xl">
         <div className="max-w-full px-40 py-6">
           <div className="flex items-center justify-between h-12">
             {/* Left side - Title and Nav Links */}
@@ -205,7 +220,7 @@ export default function Portfolio() {
           {/* Left Side - Token Holdings */}
           <div className="w-1/3 space-y-4">
             {/* Portfolio Summary */}
-            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+            <div className="bg-gray-800/90 rounded-2xl p-6 border border-gray-600/50 backdrop-blur-md shadow-xl">
               <h2 className="text-xl font-bold text-white mb-2">Total Portfolio Value</h2>
               <div className="text-3xl font-bold text-green-400">
                 ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -213,7 +228,7 @@ export default function Portfolio() {
             </div>
 
             {/* Token Holdings List */}
-            <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+            <div className="bg-gray-800/90 rounded-2xl border border-gray-600/50 backdrop-blur-md shadow-xl overflow-hidden">
               <div className="p-4 border-b border-gray-700">
                 <h3 className="text-lg font-semibold text-white">Holdings</h3>
               </div>
@@ -266,7 +281,7 @@ export default function Portfolio() {
             {selectedToken && (
               <>
                 {/* Token Info Header */}
-                <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+                <div className="bg-gray-800/90 rounded-2xl p-6 border border-gray-600/50 backdrop-blur-md shadow-xl">
                   <div className="flex items-center gap-4 mb-4">
                     <img 
                       src={selectedToken.logo} 
@@ -305,7 +320,7 @@ export default function Portfolio() {
                 </div>
 
                 {/* Price Chart */}
-                <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+                <div className="bg-gray-800/90 rounded-2xl p-6 border border-gray-600/50 backdrop-blur-md shadow-xl">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white">Price Chart</h3>
                     <div className={`text-sm px-3 py-1 rounded-full ${

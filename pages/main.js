@@ -561,9 +561,24 @@ export default function Main() {
   }, [walletService]);
 
   return (
-    <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen bg-gray-900`}>
-      {/* Dark Navbar */}
-      <nav className="bg-gray-800/50 backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
+    <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen relative`} style={{
+      background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)',
+      backgroundSize: '200% 200%',
+      animation: 'gradientShift 6s ease-in-out infinite alternate'
+    }}>
+      <style jsx>{`
+        @keyframes gradientShift {
+          0% {
+            background: radial-gradient(ellipse at 20% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
+          }
+          100% {
+            background: radial-gradient(ellipse at 80% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
+          }
+        }
+      `}</style>
+      
+      {/* Navbar with same styling as swap UI */}
+      <nav className="bg-gray-800/90 backdrop-blur-md border-b border-gray-600/50 sticky top-0 z-50 shadow-xl">
         <div className="max-w-full px-40 py-6">
           <div className="flex items-center justify-between h-12">
             {/* Left side - Title and Nav Links */}
@@ -631,7 +646,7 @@ export default function Main() {
         <div className="flex gap-4">
           {/* Left Side - Swap Interface and Leaderboard */}
           <div className="flex-shrink-0 -ml-40 space-y-0">
-            <div className="bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-700 scale-85 w-[572px] min-w-[572px] max-w-[572px]">
+            <div className="bg-gray-800/90 rounded-2xl p-6 shadow-2xl border border-gray-600/50 scale-85 w-[572px] min-w-[572px] max-w-[572px] backdrop-blur-md">
               
               {/* Pay Section */}
               <div className="bg-gray-700/50 rounded-xl p-8 mb-6">

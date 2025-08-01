@@ -198,20 +198,64 @@ export default function NFT() {
 
   if (!activeWallet) {
     return (
-      <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-        <h1>NFT Creator</h1>
-        <p>Please unlock a wallet first to access NFT features.</p>
-        <a href="/wallet" style={{ color: 'blue', textDecoration: 'underline' }}>
-          Go to Wallet Page
-        </a>
+      <div className="min-h-screen relative flex items-center justify-center" style={{
+        background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)',
+        backgroundSize: '200% 200%',
+        animation: 'gradientShift 6s ease-in-out infinite alternate',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        <style jsx>{`
+          @keyframes gradientShift {
+            0% {
+              background: radial-gradient(ellipse at 20% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
+            }
+            100% {
+              background: radial-gradient(ellipse at 80% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
+            }
+          }
+        `}</style>
+        <div className="bg-gray-800/90 backdrop-blur-md rounded-2xl p-8 border border-gray-600/50 shadow-xl text-center">
+          <h1 className="text-3xl font-bold text-white mb-4">NFT Creator</h1>
+          <p className="text-gray-300 mb-6">Please unlock a wallet first to access NFT features.</p>
+          <a href="/wallet" className="text-blue-400 hover:text-blue-300 transition-colors font-medium">
+            Go to Wallet Page →
+          </a>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>NFT Creator - Arbitrum Sepolia</h1>
-      <p><strong>Active Wallet:</strong> {activeWallet.addresses?.evm}</p>
+    <div className="min-h-screen relative" style={{
+      background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)',
+      backgroundSize: '200% 200%',
+      animation: 'gradientShift 6s ease-in-out infinite alternate',
+      padding: '20px',
+      fontFamily: 'Arial, sans-serif'
+    }}>
+      <style jsx>{`
+        @keyframes gradientShift {
+          0% {
+            background: radial-gradient(ellipse at 20% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
+          }
+          100% {
+            background: radial-gradient(ellipse at 80% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
+          }
+        }
+      `}</style>
+      
+      {/* Navbar with same styling as swap UI */}
+      <nav className="bg-gray-800/90 backdrop-blur-md border-b border-gray-600/50 sticky top-0 z-50 shadow-xl -mx-5 -mt-5 mb-5 px-10 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <h1 className="text-2xl font-bold text-white">NFT Creator</h1>
+            <span className="text-sm text-gray-300">Arbitrum Sepolia</span>
+          </div>
+          <div className="text-sm text-gray-300">
+            <strong>Active Wallet:</strong> {activeWallet.addresses?.evm}
+          </div>
+        </div>
+      </nav>
 
       {/* Tabs */}
       <div style={{ marginBottom: '20px' }}>
