@@ -11,17 +11,18 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'userAddress parameter required' });
     }
 
-    const contractAddress = '0x72dA4AE27799eB38dcEAe359c8782681f5e623ED';
+    const contractAddress = '0x4a109A21EeD37d5D1AA0e8e2DE9e50005850eC6c';
     const apiKey = process.env.ONEINCH_API_KEY;
     
     console.log('📜 Getting transaction history via 1inch API...');
     console.log('   User:', userAddress);
     console.log('   Contract:', contractAddress);
+    console.log('   Chain: Arbitrum One (42161)');
     console.log('   API Key:', apiKey ? 'Present ✅' : 'Missing ❌');
     
     // Try 1inch History API first
     try {
-      const apiUrl = `https://api.1inch.dev/history/v2.0/history/${userAddress}/events?chainId=421614&limit=50`;
+      const apiUrl = `https://api.1inch.dev/history/v2.0/history/${userAddress}/events?chainId=42161&limit=50`;
       
       const headers = {
         'Accept': 'application/json'
@@ -35,29 +36,59 @@ export default async function handler(req, res) {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('📊 1inch History API response:', data);
+        console.log('📊 1inch History API response:', `${data.items ? data.items.length : 0} items`);
         
         // Filter for PGS token transactions
         const pgsTransactions = [];
         
         if (data.items) {
           for (const item of data.items) {
-            // Look for transactions involving our PGS contract
-            if (item.details && item.details.some) {
-              const pgsDetails = item.details.filter(detail => 
-                detail.address && detail.address.toLowerCase() === contractAddress.toLowerCase()
-              );
-              
-              if (pgsDetails.length > 0) {
-                pgsTransactions.push({
-                  id: item.txHash + '_' + item.logIndex,
-                  txHash: item.txHash,
-                  timestamp: new Date(item.timeMs).toLocaleString(),
-                  blockNumber: item.blockNumber,
-                  type: item.action || 'unknown',
-                  details: pgsDetails
-                });
+            // Check if this transaction involves our PGS token
+            let isPgsTransaction = false;
+            let transactionType = 'unknown';
+            let amount = '0';
+            let otherParty = null;
+            
+            // Check the new 1inch API format with tokenActions
+            if (item.details && item.details.tokenActions && Array.isArray(item.details.tokenActions)) {
+              for (const tokenAction of item.details.tokenActions) {
+                if (tokenAction.address && tokenAction.address.toLowerCase() === contractAddress.toLowerCase()) {
+                  isPgsTransaction = true;
+                  
+                  // Parse the 1inch API tokenAction format
+                  const { ethers } = require('ethers');
+                  amount = ethers.formatEther(tokenAction.amount);
+                  
+                  // Determine transaction type based on addresses
+                  if (tokenAction.fromAddress === '0x0000000000000000000000000000000000000000') {
+                    // Token minted from zero address
+                    transactionType = 'mint';
+                  } else if (tokenAction.toAddress.toLowerCase() === userAddress.toLowerCase()) {
+                    // Tokens received by user
+                    transactionType = 'receive';
+                    otherParty = tokenAction.fromAddress;
+                  } else if (tokenAction.fromAddress.toLowerCase() === userAddress.toLowerCase()) {
+                    // Tokens sent by user
+                    transactionType = 'transfer_out';
+                    otherParty = tokenAction.toAddress;
+                  }
+                  
+                  break;
+                }
               }
+            }
+            
+            if (isPgsTransaction) {
+              pgsTransactions.push({
+                id: `1inch_${item.details.txHash}_${item.eventOrderInTransaction || 0}`,
+                type: transactionType,
+                txHash: item.details.txHash,
+                timestamp: new Date(item.timeMs).toLocaleString(),
+                blockNumber: item.details.blockNumber,
+                ...(transactionType === 'mint' && { tokensEarned: amount }),
+                ...(transactionType === 'receive' && { amountReceived: amount, sender: otherParty }),
+                ...(transactionType === 'transfer_out' && { amountTransferred: amount, recipient: otherParty })
+              });
             }
           }
         }
@@ -81,7 +112,7 @@ export default async function handler(req, res) {
       const { ethers } = require('ethers');
       
       const provider = new ethers.JsonRpcProvider(
-        process.env.ARBITRUM_SEPOLIA_RPC_URL || 'https://sepolia-rollup.arbitrum.io/rpc'
+        process.env.ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc'
       );
       
       const contractABI = [

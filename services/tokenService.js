@@ -78,11 +78,16 @@ export class TokenService {
   // Load contract address from deployment info file
   async loadContractAddress() {
     try {
-      // Try to load from Arbitrum Sepolia deployment info first
-      let response = await fetch('/deployment-info/pgs-deployment-arbitrumSepolia.json')
+      // Try to load from Arbitrum One (mainnet) deployment info first
+      let response = await fetch('/deployment-info/pgs-deployment-arbitrumOne.json')
       
       if (!response.ok) {
-        // Fallback to regular sepolia if arbitrum sepolia not found
+        // Fallback to Arbitrum Sepolia if mainnet not found
+        response = await fetch('/deployment-info/pgs-deployment-arbitrumSepolia.json')
+      }
+      
+      if (!response.ok) {
+        // Final fallback to regular sepolia
         response = await fetch('/deployment-info/pgs-deployment-sepolia.json')
       }
       
@@ -128,10 +133,10 @@ export class TokenService {
       const network = await this.signer.provider.getNetwork()
       console.log('Connected to network:', network.name, 'Chain ID:', network.chainId)
       
-      // Support both Arbitrum Sepolia and Ethereum Sepolia
-      const supportedChainIds = [421614n, 11155111n] // Arbitrum Sepolia, Ethereum Sepolia
+      // Support Arbitrum One mainnet and testnets
+      const supportedChainIds = [42161n, 421614n, 11155111n] // Arbitrum One, Arbitrum Sepolia, Ethereum Sepolia
       if (!supportedChainIds.includes(network.chainId)) {
-        throw new Error(`Unsupported network! Expected Arbitrum Sepolia (421614) or Ethereum Sepolia (11155111), got ${network.chainId}`)
+        throw new Error(`Unsupported network! Expected Arbitrum One (42161), Arbitrum Sepolia (421614) or Ethereum Sepolia (11155111), got ${network.chainId}`)
       }
       
     } catch (error) {
@@ -296,10 +301,10 @@ export class TokenService {
     console.log('🌐 Fetching balance via 1inch API...')
     console.log('   User address:', userAddress)
     console.log('   Contract address:', this.contractAddress)
-    console.log('   Chain ID: 421614 (Arbitrum Sepolia)')
+    console.log('   Chain ID: 42161 (Arbitrum One)')
     console.log('   API Key status:', this.oneInchApiKey ? 'Available ✅' : 'Missing ❌')
     
-    const apiUrl = `https://api.1inch.dev/balance/v1.2/421614/balances/${userAddress}`
+    const apiUrl = `https://api.1inch.dev/balance/v1.2/42161/balances/${userAddress}`
     
     const headers = {
       'Accept': 'application/json'

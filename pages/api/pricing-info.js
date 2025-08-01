@@ -14,11 +14,16 @@ export default async function handler(req, res) {
     // Load contract address from deployment info
     let contractAddress;
     try {
-      // Try Arbitrum Sepolia first
-      let response = await fetch(`${req.headers.origin || 'http://localhost:3000'}/deployment-info/pgs-deployment-arbitrumSepolia.json`);
+      // Try Arbitrum One (mainnet) first
+      let response = await fetch(`${req.headers.origin || 'http://localhost:3000'}/deployment-info/pgs-deployment-arbitrumOne.json`);
       
       if (!response.ok) {
-        // Fallback to regular sepolia
+        // Fallback to Arbitrum Sepolia
+        response = await fetch(`${req.headers.origin || 'http://localhost:3000'}/deployment-info/pgs-deployment-arbitrumSepolia.json`);
+      }
+      
+      if (!response.ok) {
+        // Final fallback to regular sepolia
         response = await fetch(`${req.headers.origin || 'http://localhost:3000'}/deployment-info/pgs-deployment-sepolia.json`);
       }
       
@@ -35,9 +40,9 @@ export default async function handler(req, res) {
       });
     }
 
-    // Create provider (Arbitrum Sepolia)
+    // Create provider (Arbitrum One)
     const provider = new ethers.JsonRpcProvider(
-      process.env.ARBITRUM_SEPOLIA_RPC_URL || 'https://sepolia-rollup.arbitrum.io/rpc'
+      process.env.ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc'
     );
 
     // Contract ABI for pricing functions

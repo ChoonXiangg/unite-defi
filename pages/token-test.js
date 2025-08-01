@@ -17,6 +17,7 @@ export default function TokenTest() {
   const [walletConnected, setWalletConnected] = useState(false)
   const [userAddress, setUserAddress] = useState('')
   const [dataLoading, setDataLoading] = useState(false)
+  const [pollingForNewTx, setPollingForNewTx] = useState(false)
   
   // Transfer states
   const [transferAddress, setTransferAddress] = useState('')
@@ -79,11 +80,60 @@ export default function TokenTest() {
     }
   }
 
-  // Auto-reload data after transactions with delay
+  // Auto-reload data after transactions with intelligent polling
   const autoReloadAfterTransaction = async () => {
-    console.log('🔄 Transaction completed, auto-reloading data in 3 seconds...')
-    await new Promise(resolve => setTimeout(resolve, 3000)) // Wait for blockchain confirmation
+    console.log('🔄 Transaction completed, auto-reloading data...')
+    
+    // Get current transaction count before polling
+    const currentTxCount = transactions.length
+    
+    // Immediate reload for balance
     await loadAllData()
+    
+    // Start intelligent polling for transaction history
+    let pollAttempts = 0
+    const maxAttempts = 12 // Maximum 2 minutes of polling
+    setPollingForNewTx(true) // Show polling indicator
+    
+    const pollForNewTransaction = async () => {
+      pollAttempts++
+      console.log(`🔄 Polling attempt ${pollAttempts}/12 for new transaction...`)
+      
+      try {
+        const response = await fetch(`/api/get-history?userAddress=${userAddress}`)
+        const result = await response.json()
+        
+        if (result.success && result.transactions.length > currentTxCount) {
+          // New transaction found!
+          console.log(`✅ New transaction detected! Found ${result.transactions.length} transactions (was ${currentTxCount})`)
+          setTransactions(result.transactions)
+          setPollingForNewTx(false) // Hide polling indicator
+          console.log('🎉 Transaction history automatically updated!')
+          return // Stop polling
+        }
+        
+        // If no new transaction and haven't reached max attempts, continue polling
+        if (pollAttempts < maxAttempts) {
+          setTimeout(pollForNewTransaction, 10000) // Poll every 10 seconds
+        } else {
+          console.log('⏰ Stopped polling after 2 minutes. Transaction may take longer to index.')
+          setPollingForNewTx(false) // Hide polling indicator
+        }
+        
+      } catch (error) {
+        console.warn(`⚠️ Polling attempt ${pollAttempts} failed:`, error.message)
+        
+        // Continue polling even if one attempt fails
+        if (pollAttempts < maxAttempts) {
+          setTimeout(pollForNewTransaction, 10000)
+        } else {
+          setPollingForNewTx(false) // Hide polling indicator on final failure
+        }
+      }
+    }
+    
+    // Start polling after initial 5-second delay
+    setTimeout(pollForNewTransaction, 5000)
   }
 
   // Load real transaction history from blockchain
@@ -99,7 +149,9 @@ export default function TokenTest() {
       
       if (result.success) {
         console.log(`✅ History loaded via ${result.source}:`, result.transactions.length, 'transactions')
+        console.log('📊 Transaction data:', result.transactions)
         setTransactions(result.transactions)
+        console.log('✅ Transactions state updated')
       } else {
         throw new Error(result.error || 'Failed to get transaction history')
       }
@@ -190,13 +242,13 @@ export default function TokenTest() {
 
   const setupContractService = async () => {
     try {
-      // Make sure we're connected to Arbitrum Sepolia first
+      // Make sure we're connected to Arbitrum One first
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x66eee' }] // 421614 in hex - Arbitrum Sepolia Testnet
+        params: [{ chainId: '0xa4b1' }] // 42161 in hex - Arbitrum One Mainnet
       })
       
-      // Create provider for Arbitrum Sepolia Testnet
+      // Create provider for Arbitrum One Mainnet
       const provider = new ethers.BrowserProvider(window.ethereum)
       await provider.send("eth_requestAccounts", [])
       
@@ -212,38 +264,38 @@ export default function TokenTest() {
       }
     } catch (error) {
       console.error('Contract setup failed:', error)
-      setError('Failed to connect to contract. Make sure MetaMask is connected to Arbitrum Sepolia Testnet')
+      setError('Failed to connect to contract. Make sure MetaMask is connected to Arbitrum One Mainnet')
     }
   }
 
-  const addArbitrumSepoliaNetwork = async () => {
+  const addArbitrumOneNetwork = async () => {
     try {
       await window.ethereum.request({
         method: 'wallet_addEthereumChain',
         params: [{
-          chainId: '0x66eee', // 421614 in hex
-          chainName: 'Arbitrum Sepolia',
-          rpcUrls: ['https://sepolia-rollup.arbitrum.io/rpc'],
+          chainId: '0xa4b1', // 42161 in hex
+          chainName: 'Arbitrum One',
+          rpcUrls: ['https://arb1.arbitrum.io/rpc'],
           nativeCurrency: {
             name: 'ETH',
             symbol: 'ETH',
             decimals: 18
           },
-          blockExplorerUrls: ['https://sepolia.arbiscan.io/']
+          blockExplorerUrls: ['https://arbiscan.io/']
         }]
       })
-      console.log('✅ Arbitrum Sepolia network added to MetaMask')
+      console.log('✅ Arbitrum One network added to MetaMask')
     } catch (error) {
       console.error('Failed to add network:', error)
-      setError('Failed to add Arbitrum Sepolia to MetaMask')
+      setError('Failed to add Arbitrum One to MetaMask')
     }
   }
 
   const connectWallet = async () => {
     if (typeof window !== 'undefined' && window.ethereum) {
       try {
-        // First try to add/switch to Arbitrum Sepolia network
-        await addArbitrumSepoliaNetwork()
+        // First try to add/switch to Arbitrum One network
+        await addArbitrumOneNetwork()
         
         const accounts = await window.ethereum.request({ 
           method: 'eth_requestAccounts' 
@@ -471,19 +523,19 @@ export default function TokenTest() {
           </button>
 
           <button
-            onClick={addArbitrumSepoliaNetwork}
+            onClick={addArbitrumOneNetwork}
             className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
           >
-            📡 Add Arbitrum Sepolia to MetaMask
+            📡 Add Arbitrum One to MetaMask
           </button>
           
           <div className="mt-6 text-sm text-gray-500">
             <p><strong>Setup Instructions:</strong></p>
-            <p>1. Click &quot;Add Arbitrum Sepolia&quot; button above</p>
-            <p>2. Get free testnet ETH from: <a href="https://faucets.chain.link/arbitrum-sepolia" target="_blank" className="text-blue-600 underline">Chainlink Arbitrum Sepolia Faucet</a></p>
-            <p>3. Connect wallet to start testing real Arbitrum blockchain transactions</p>
+            <p>1. Click &quot;Add Arbitrum One&quot; button above</p>
+            <p>2. Make sure you have ETH on Arbitrum One mainnet</p>
+            <p>3. Connect wallet to start using real PGS tokens on mainnet!</p>
             <p className="text-xs mt-2">
-              <strong>Need more ETH?</strong> Try <a href="https://bridge.arbitrum.io/" target="_blank" className="text-blue-600 underline">Arbitrum Bridge</a> (bridge from Ethereum Sepolia)
+              <strong>Need ETH on Arbitrum?</strong> Use <a href="https://bridge.arbitrum.io/" target="_blank" className="text-blue-600 underline">Arbitrum Bridge</a> to bridge from Ethereum mainnet
             </p>
           </div>
         </div>
@@ -752,7 +804,7 @@ export default function TokenTest() {
                     <p className="text-xs text-gray-400 mt-1">{tx.timestamp}</p>
                     <p className="text-xs font-mono text-gray-400">
                       <a 
-                        href={`https://sepolia.arbiscan.io/tx/${tx.txHash}`} 
+                        href={`https://arbiscan.io/tx/${tx.txHash}`} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="hover:text-blue-600"
@@ -802,11 +854,11 @@ export default function TokenTest() {
             </div>
             <div className="mt-4 p-3 bg-blue-100 rounded">
               <p className="text-blue-800 text-sm">
-                <strong>Note:</strong> This connects to Arbitrum Sepolia Testnet blockchain. 
-                All transactions are real and visible on Arbiscan.
+                <strong>Note:</strong> This connects to Arbitrum One Mainnet blockchain. 
+                All transactions are real and cost real money!
               </p>
               <p className="text-blue-800 text-xs mt-2">
-                <strong>Block Explorer:</strong> <a href="https://sepolia.arbiscan.io/" target="_blank" className="underline">sepolia.arbiscan.io</a>
+                <strong>Block Explorer:</strong> <a href="https://arbiscan.io/" target="_blank" className="underline">arbiscan.io</a>
               </p>
             </div>
           </div>

@@ -11,17 +11,19 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'userAddress parameter required' });
     }
 
-    const contractAddress = '0x72dA4AE27799eB38dcEAe359c8782681f5e623ED';
+    const contractAddress = '0x4a109A21EeD37d5D1AA0e8e2DE9e50005850eC6c';
     const apiKey = process.env.ONEINCH_API_KEY;
     
     console.log('🌐 Getting PGS balance via 1inch API...');
     console.log('   User:', userAddress);
     console.log('   Contract:', contractAddress);
+    console.log('   Chain: Arbitrum One (42161)');
     console.log('   API Key:', apiKey ? 'Present ✅' : 'Missing ❌');
     
-    // Try 1inch Balance API first
+    // Try 1inch Balance API first (hybrid approach)
     try {
-      const apiUrl = `https://api.1inch.dev/balance/v1.2/421614/balances/${userAddress}`;
+      // First get all balances from 1inch
+      const generalApiUrl = `https://api.1inch.dev/balance/v1.2/42161/balances/${userAddress}`;
       
       const headers = {
         'Accept': 'application/json'
@@ -31,35 +33,69 @@ export default async function handler(req, res) {
         headers['Authorization'] = `Bearer ${apiKey}`;
       }
       
-      const response = await fetch(apiUrl, { headers });
+      const response = await fetch(generalApiUrl, { headers });
       
       if (response.ok) {
         const data = await response.json();
-        console.log('📊 1inch API response:', data);
+        console.log(`✅ 1inch API call successful - found ${Object.keys(data).length} tokens`);
         
-        // Extract PGS token balance
-        const pgsBalance = data[contractAddress.toLowerCase()] || data[contractAddress] || '0';
+        // Check if our PGS token is in the response
+        let pgsBalanceWei = data[contractAddress.toLowerCase()] || 
+                           data[contractAddress] || 
+                           data[contractAddress.toUpperCase()];
         
-        return res.status(200).json({
-          success: true,
-          source: '1inch_api',
-          balance: pgsBalance,
-          userAddress,
-          contractAddress
-        });
+        if (pgsBalanceWei !== undefined && pgsBalanceWei !== '0') {
+          // PGS token found with balance > 0 in 1inch API
+          const { ethers } = require('ethers');
+          const pgsBalance = ethers.formatEther(pgsBalanceWei);
+          console.log(`🎉 PGS balance found via 1inch API: ${pgsBalance} PGS`);
+          
+          return res.status(200).json({
+            success: true,
+            source: '1inch_api',
+            balance: pgsBalance,
+            userAddress,
+            contractAddress
+          });
+        } else {
+          // PGS token not indexed by 1inch yet - check contract directly
+          console.log('📊 1inch API working but PGS not indexed yet, checking contract...');
+          
+          // Get PGS balance from contract
+          const { ethers } = require('ethers');
+          const provider = new ethers.JsonRpcProvider(
+            process.env.ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc'
+          );
+          
+          const contractABI = ["function balanceOf(address) view returns (uint256)"];
+          const contract = new ethers.Contract(contractAddress, contractABI, provider);
+          const pgsBalanceWei = await contract.balanceOf(userAddress);
+          const pgsBalance = ethers.formatEther(pgsBalanceWei);
+          
+          console.log(`✅ PGS balance from contract: ${pgsBalance} PGS`);
+          
+          return res.status(200).json({
+            success: true,
+            source: '1inch_api_with_contract_fallback',
+            balance: pgsBalance,
+            userAddress,
+            contractAddress,
+            note: '1inch API working but PGS not indexed yet - used direct contract call'
+          });
+        }
       } else {
         const errorText = await response.text();
         console.error('❌ 1inch API error:', response.status, errorText);
         throw new Error(`1inch API failed: ${response.status}`);
       }
     } catch (apiError) {
-      console.warn('⚠️ 1inch API failed, using contract fallback:', apiError.message);
+      console.warn('⚠️ 1inch API failed completely, using contract fallback:', apiError.message);
       
       // Fallback to direct contract call
       const { ethers } = require('ethers');
       
       const provider = new ethers.JsonRpcProvider(
-        process.env.ARBITRUM_SEPOLIA_RPC_URL || 'https://sepolia-rollup.arbitrum.io/rpc'
+        process.env.ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc'
       );
       
       const contractABI = ["function name() view returns (string)", "function balanceOf(address) view returns (uint256)"];

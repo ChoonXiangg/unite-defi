@@ -115,9 +115,9 @@ async function setupSecureContract() {
     // Add 0x prefix if not present
     const formattedPrivateKey = ownerPrivateKey.startsWith('0x') ? ownerPrivateKey : `0x${ownerPrivateKey}`;
 
-    // Connect to Arbitrum Sepolia
+    // Connect to Arbitrum One mainnet
     const provider = new ethers.JsonRpcProvider(
-      process.env.ARBITRUM_SEPOLIA_RPC_URL || 'https://sepolia-rollup.arbitrum.io/rpc'
+      process.env.ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc'
     );
 
     // Create owner's wallet (backend holds this securely)
@@ -153,8 +153,13 @@ async function setupSecureContract() {
 // Load deployment information
 async function loadDeploymentInfo() {
   try {
-    // Load deployment info from public directory
-    const deploymentFile = path.join(process.cwd(), 'public', 'deployment-info', 'pgs-deployment-arbitrumSepolia.json');
+    // Load deployment info from public directory (try mainnet first)
+    let deploymentFile = path.join(process.cwd(), 'public', 'deployment-info', 'pgs-deployment-arbitrumOne.json');
+    
+    // Check if mainnet deployment file exists, fallback to testnet if not
+    if (!fs.existsSync(deploymentFile)) {
+      deploymentFile = path.join(process.cwd(), 'public', 'deployment-info', 'pgs-deployment-arbitrumSepolia.json');
+    }
     const deploymentData = fs.readFileSync(deploymentFile, 'utf8');
     return JSON.parse(deploymentData);
   } catch (error) {
