@@ -198,9 +198,8 @@ export default function NFT() {
 
   if (!activeWallet) {
     return (
-      <div className="min-h-screen relative flex items-center justify-center" style={{
-        background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)',
-        fontFamily: 'Arial, sans-serif'
+      <div className="min-h-screen relative flex items-center justify-center font-sans" style={{
+        background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)'
       }}>
         <div className="bg-gray-800/90 backdrop-blur-md rounded-2xl p-8 border border-gray-600/50 shadow-xl text-center">
           <h1 className="text-3xl font-bold text-white mb-4">NFT Creator</h1>
@@ -214,10 +213,9 @@ export default function NFT() {
   }
 
   return (
-    <div className="min-h-screen relative" style={{
+    <div className="min-h-screen relative font-sans" style={{
       background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)',
-      padding: '20px',
-      fontFamily: 'Arial, sans-serif'
+      padding: '20px'
     }}>
       
       {/* Navbar with same styling as swap UI */}

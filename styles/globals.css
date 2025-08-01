@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
+/* Custom font face definition */
+@font-face {
+  font-family: 'Supercell Magic';
+  src: url('/supercell-magic-webfont.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --font-supercell: 'Supercell Magic', Arial, Helvetica, sans-serif;
 }
 
 @theme inline {
@@ -23,4 +33,9 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Supercell Magic font utility class */
+.font-supercell {
+  font-family: var(--font-supercell);
 }

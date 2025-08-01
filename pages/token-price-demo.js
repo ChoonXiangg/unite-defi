@@ -3,13 +3,13 @@ import { Geist, Geist_Mono } from "next/font/google";
 import RealTimeTokenPrice from "../components/RealTimeTokenPrice";
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
+  variable: "--font-geist-sans",  
   subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  subsets: ["latin"], 
 });
 
 // Supported tokens with their CoinGecko IDs
@@ -49,7 +49,7 @@ export default function TokenPriceDemo() {
   };
 
   return (
-    <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen relative`} style={{
+    <div className={`${geistSans.className} ${geistMono.className} min-h-screen relative`} style={{
       background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)'
     }}>
       

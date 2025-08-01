@@ -593,11 +593,11 @@ export default function Main() {
               <div className="flex items-center gap-8 transform translate-y-1">
                 <a 
                   href="/portfolio"
-                  className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200"
+                  className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 font-supercell"
                 >
                   Portfolio
                 </a>
-                <span className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 cursor-pointer">
+                <span className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 cursor-pointer font-supercell">
                   NFT
                 </span>
               </div>
@@ -638,7 +638,7 @@ export default function Main() {
               
               {/* Pay Section */}
               <div className="bg-gray-700/50 rounded-xl p-8 mb-6">
-                <label className="block text-xl font-medium text-gray-400 mb-4">Pay</label>
+                <label className="block text-xl font-medium text-gray-400 mb-4 font-supercell" style={{fontSize: '95%'}}>Pay</label>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0 overflow-hidden">
@@ -653,8 +653,8 @@ export default function Main() {
                           }
                         }}
                         placeholder="0"
-                        className="w-full bg-transparent text-4xl font-bold text-white placeholder-gray-500 focus:outline-none max-w-[150px] min-w-0"
-                        style={{ width: '150px' }}
+                        className="w-full bg-transparent text-4xl font-bold text-white placeholder-gray-500 focus:outline-none max-w-[150px] min-w-0 font-supercell"
+                        style={{ width: '150px', fontSize: '105%' }}
                       />
                       {fromAmount && parseFloat(fromAmount) > 0 && (
                         <div className="text-base text-gray-400 mt-1">
@@ -777,7 +777,7 @@ export default function Main() {
 
               {/* Receive Section */}
               <div className="bg-gray-700/50 rounded-xl p-8 mb-8">
-                <label className="block text-xl font-medium text-gray-400 mb-4">Receive</label>
+                <label className="block text-xl font-medium text-gray-400 mb-4 font-supercell" style={{fontSize: '95%'}}>Receive</label>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0 overflow-hidden">
@@ -792,8 +792,8 @@ export default function Main() {
                           }
                         }}
                         placeholder="0"
-                        className="w-full bg-transparent text-4xl font-bold text-white placeholder-gray-500 focus:outline-none max-w-[150px] min-w-0"
-                        style={{ width: '150px' }}
+                        className="w-full bg-transparent text-4xl font-bold text-white placeholder-gray-500 focus:outline-none max-w-[150px] min-w-0 font-supercell"
+                        style={{ width: '150px', fontSize: '105%' }}
                       />
                       {toAmount && parseFloat(toAmount) > 0 && (
                         <div className="text-base text-gray-400 mt-1">
@@ -915,7 +915,7 @@ export default function Main() {
               <div className="bg-gray-700/30 rounded-xl p-6 mb-8">
                 <div className="space-y-3 text-base">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Rate:</span>
+                    <span className="text-gray-400 font-supercell" style={{fontSize: '95%'}}>Rate:</span>
                     <span className="text-white font-medium">
                       {currentRate ? 
                         `1 ${fromToken} ≈ ${parseFloat(currentRate).toFixed(6)} ${toToken}` :
@@ -927,7 +927,7 @@ export default function Main() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Gas Fee:</span>
+                    <span className="text-gray-400 font-supercell" style={{fontSize: '95%'}}>Gas Fee:</span>
                     <span className="text-white font-medium">
                       {gasEstimate && gasData ? (
                         <>
@@ -943,7 +943,7 @@ export default function Main() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-400">$PGS mint:</span>
+                    <span className="text-gray-400 font-supercell" style={{fontSize: '95%'}}>$PGS mint:</span>
                     <span className="text-white font-medium">20.999</span>
                   </div>
                 </div>

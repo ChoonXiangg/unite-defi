@@ -17,6 +17,16 @@ const geistMono = Geist_Mono({
 // Mock portfolio data - in real app this would come from API
 const mockPortfolioData = [
   {
+    symbol: "1INCH",
+    name: "1inch Network", 
+    balance: "15000.00",
+    value: 8750.00,
+    price: 0.583,
+    change24h: 12.4,
+    logo: "https://assets.coingecko.com/coins/images/13469/small/1inch-token.png",
+    priceHistory: [0.520, 0.545, 0.560, 0.575, 0.583, 0.590, 0.585, 0.580, 0.583]
+  },
+  {
     symbol: "ETH",
     name: "Ethereum", 
     balance: "2.45",
@@ -25,6 +35,16 @@ const mockPortfolioData = [
     change24h: 5.2,
     logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
     priceHistory: [2380, 2410, 2390, 2420, 2450, 2480, 2450, 2470, 2450]
+  },
+  {
+    symbol: "BTC",
+    name: "Bitcoin",
+    balance: "0.08",
+    value: 3600.00,
+    price: 45000.00,
+    change24h: -2.1,
+    logo: "https://assets.coingecko.com/coins/images/1/small/bitcoin.png",
+    priceHistory: [44500, 45200, 44800, 45500, 45000, 46000, 45200, 44800, 45000]
   },
   {
     symbol: "USDC",
@@ -37,24 +57,14 @@ const mockPortfolioData = [
     priceHistory: [0.999, 1.000, 0.998, 1.001, 1.000, 0.999, 1.000, 1.001, 1.000]
   },
   {
-    symbol: "BTC",
-    name: "Bitcoin",
-    balance: "0.05",
-    value: 2250.00,
-    price: 45000.00,
-    change24h: -2.1,
-    logo: "https://assets.coingecko.com/coins/images/1/small/bitcoin.png",
-    priceHistory: [44500, 45200, 44800, 45500, 45000, 46000, 45200, 44800, 45000]
-  },
-  {
-    symbol: "MATIC",
-    name: "Polygon",
-    balance: "800.00",
-    value: 640.00,
-    price: 0.80,
-    change24h: 3.4,
-    logo: "https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png",
-    priceHistory: [0.75, 0.78, 0.76, 0.82, 0.80, 0.84, 0.81, 0.79, 0.80]
+    symbol: "XRP",
+    name: "XRP",
+    balance: "2000.00",
+    value: 1200.00,
+    price: 0.60,
+    change24h: -1.8,
+    logo: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png",
+    priceHistory: [0.62, 0.61, 0.58, 0.59, 0.60, 0.63, 0.61, 0.58, 0.60]
   }
 ];
 
@@ -62,16 +72,11 @@ const mockPortfolioData = [
 // Helper function to map token symbols to CoinGecko IDs
 const getCoinGeckoId = (symbol) => {
   const coinGeckoMapping = {
+    '1INCH': '1inch',
     'ETH': 'ethereum',
     'BTC': 'bitcoin',
     'USDC': 'usd-coin',
-    'USDT': 'tether',
-    'MATIC': 'matic-network',
-    'BNB': 'binancecoin',
-    'AVAX': 'avalanche-2',
-    'LINK': 'chainlink',
-    'UNI': 'uniswap',
-    'DAI': 'dai'
+    'XRP': 'ripple'
   };
   
   return coinGeckoMapping[symbol?.toUpperCase()] || 'ethereum';
@@ -128,7 +133,7 @@ export default function Portfolio() {
   };
 
   return (
-    <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen relative`} style={{
+    <div className={`${geistSans.className} ${geistMono.className} min-h-screen relative`} style={{
       background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)'
     }}>
       
@@ -160,11 +165,11 @@ export default function Portfolio() {
               <div className="flex items-center gap-8 transform translate-y-1">
                 <a 
                   href="/portfolio"
-                  className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200"
+                  className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 font-supercell"
                 >
                   Portfolio
                 </a>
-                <span className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 cursor-pointer">
+                <span className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 cursor-pointer font-supercell">
                   NFT
                 </span>
               </div>
@@ -204,12 +209,12 @@ export default function Portfolio() {
             {/* Combined Portfolio Summary and Holdings */}
             <div className="bg-gray-800/90 rounded-2xl border border-gray-600/50 backdrop-blur-md shadow-xl overflow-hidden">
               <div className="p-6 border-b border-gray-700">
-                <h2 className="text-xl font-bold text-white mb-2">Total Portfolio Value</h2>
+                <h2 className="text-xl font-bold text-white mb-2 font-supercell">Holdings</h2>
                 <div className="text-3xl font-bold text-green-400 mb-4">
                   ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
-              <div className="max-h-96 overflow-y-auto">
+              <div>
                 {portfolio.map((token) => (
                   <button
                     key={token.symbol}
@@ -230,7 +235,7 @@ export default function Portfolio() {
                     />
                     <div className="flex-1 text-left">
                       <div className="flex items-center gap-2">
-                        <span className="text-white font-semibold">{token.symbol}</span>
+                        <span className="text-white font-semibold font-supercell" style={{fontSize: '80%'}}>{token.symbol}</span>
                         <span className={`text-xs px-2 py-1 rounded ${
                           token.change24h >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
                         }`}>
@@ -269,7 +274,7 @@ export default function Portfolio() {
                       }}
                     />
                     <div>
-                      <h2 className="text-2xl font-bold text-white">{selectedToken.name}</h2>
+                      <h2 className="text-2xl font-bold text-white font-supercell">{selectedToken.name}</h2>
                       <div className="text-gray-400">{selectedToken.symbol}</div>
                       {(priceError || usingFallback) && (
                         <div className="text-xs text-yellow-400">
