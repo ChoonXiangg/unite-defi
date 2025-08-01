@@ -564,27 +564,37 @@ export default function Main() {
     <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen bg-gray-900`}>
       {/* Dark Navbar */}
       <nav className="bg-gray-800/50 backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
-        <div className="max-w-full px-8 py-6">
+        <div className="max-w-full px-40 py-6">
           <div className="flex items-center justify-between h-12">
             {/* Left side - Title and Nav Links */}
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-20">
               {/* Title */}
+              <img 
+                src="/title.svg"
+                alt="PegaSwap"
+                onClick={() => window.location.href = '/main'}
+                className="h-12 scale-150 cursor-pointer hover:opacity-80 transition-opacity duration-200"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextElementSibling.style.display = 'block';
+                }}
+              />
               <h1 
                 onClick={() => window.location.href = '/main'}
-                className="text-4xl font-bold text-white cursor-pointer hover:text-gray-200 transition-colors"
+                className="text-4xl font-bold text-white cursor-pointer hover:text-gray-200 transition-colors hidden"
               >
                 PegaSwap
               </h1>
               
               {/* Navigation Links */}
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-6 transform translate-y-1">
                 <a 
                   href="/portfolio"
-                  className="text-lg font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200"
+                  className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200"
                 >
                   Portfolio
                 </a>
-                <span className="text-lg font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 cursor-pointer">
+                <span className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 cursor-pointer">
                   NFT
                 </span>
               </div>
@@ -620,13 +630,13 @@ export default function Main() {
       <div className="max-w-7xl mx-auto p-4">
         <div className="flex gap-4">
           {/* Left Side - Swap Interface and Leaderboard */}
-          <div className="flex-shrink-0 -ml-16 space-y-0">
+          <div className="flex-shrink-0 -ml-40 space-y-0">
             <div className="bg-gray-800 rounded-2xl p-6 shadow-2xl border border-gray-700 scale-85 w-[572px] min-w-[572px] max-w-[572px]">
               
               {/* Pay Section */}
-              <div className="bg-gray-700/50 rounded-xl p-7 mb-5">
-                <label className="block text-lg font-medium text-gray-400 mb-3">Pay</label>
-                <div className="space-y-3">
+              <div className="bg-gray-700/50 rounded-xl p-8 mb-6">
+                <label className="block text-xl font-medium text-gray-400 mb-4">Pay</label>
+                <div className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0 overflow-hidden">
                       <input
@@ -640,11 +650,11 @@ export default function Main() {
                           }
                         }}
                         placeholder="0"
-                        className="w-full bg-transparent text-3xl font-bold text-white placeholder-gray-500 focus:outline-none max-w-[150px] min-w-0"
+                        className="w-full bg-transparent text-4xl font-bold text-white placeholder-gray-500 focus:outline-none max-w-[150px] min-w-0"
                         style={{ width: '150px' }}
                       />
                       {fromAmount && parseFloat(fromAmount) > 0 && (
-                        <div className="text-sm text-gray-400 mt-1">
+                        <div className="text-base text-gray-400 mt-1">
                           ≈ ${getUSDEquivalent(fromAmount, fromToken)}
                         </div>
                       )}
@@ -652,22 +662,22 @@ export default function Main() {
                     <div className="relative">
                       <button
                         onClick={() => setShowFromDropdown(!showFromDropdown)}
-                        className="flex items-center gap-3 bg-gray-800 hover:bg-gray-700 rounded-2xl px-4 py-3 transition-all duration-200 border border-gray-600 hover:border-gray-500 shadow-lg"
+                        className="flex items-center gap-4 bg-gray-800 hover:bg-gray-700 rounded-2xl px-5 py-4 transition-all duration-200 border border-gray-600 hover:border-gray-500 shadow-lg"
                       >
                         <div className="relative">
                           <img 
                             src={getTokenLogo(fromToken, getTokenChain(fromToken))} 
                             alt={fromToken}
-                            className="w-8 h-8 rounded-full"
+                            className="w-10 h-10 rounded-full"
                             onError={(e) => {
                               e.target.src = "https://via.placeholder.com/32x32/666666/ffffff?text=" + fromToken;
                             }}
                           />
-                          <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full ${getChainColor(getTokenChain(fromToken))} border-2 border-gray-800 flex items-center justify-center`}>
+                          <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${getChainColor(getTokenChain(fromToken))} border-2 border-gray-800 flex items-center justify-center`}>
                             <img 
                               src={getChainLogo(getTokenChain(fromToken))} 
                               alt={getTokenChain(fromToken)}
-                              className="w-2.5 h-2.5 rounded-full"
+                              className="w-3 h-3 rounded-full"
                               onError={(e) => {
                                 e.target.style.display = 'none';
                               }}
@@ -675,9 +685,9 @@ export default function Main() {
                           </div>
                         </div>
                         <div className="text-left">
-                          <div className="text-white font-semibold text-lg">{fromToken}</div>
+                          <div className="text-white font-semibold text-xl">{fromToken}</div>
                         </div>
-                        <svg className="w-4 h-4 text-gray-400 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-gray-400 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
@@ -754,18 +764,18 @@ export default function Main() {
               </div>
 
               {/* Swap Arrow */}
-              <div className="flex justify-center mb-5">
-                <div className="w-10 h-10 bg-gray-600 hover:bg-gray-500 rounded-full flex items-center justify-center text-white cursor-pointer transition-colors">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex justify-center mb-6">
+                <div className="w-12 h-12 bg-gray-600 hover:bg-gray-500 rounded-full flex items-center justify-center text-white cursor-pointer transition-colors">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                   </svg>
                 </div>
               </div>
 
               {/* Receive Section */}
-              <div className="bg-gray-700/50 rounded-xl p-7 mb-7">
-                <label className="block text-lg font-medium text-gray-400 mb-3">Receive</label>
-                <div className="space-y-3">
+              <div className="bg-gray-700/50 rounded-xl p-8 mb-8">
+                <label className="block text-xl font-medium text-gray-400 mb-4">Receive</label>
+                <div className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0 overflow-hidden">
                       <input
@@ -779,11 +789,11 @@ export default function Main() {
                           }
                         }}
                         placeholder="0"
-                        className="w-full bg-transparent text-3xl font-bold text-white placeholder-gray-500 focus:outline-none max-w-[150px] min-w-0"
+                        className="w-full bg-transparent text-4xl font-bold text-white placeholder-gray-500 focus:outline-none max-w-[150px] min-w-0"
                         style={{ width: '150px' }}
                       />
                       {toAmount && parseFloat(toAmount) > 0 && (
-                        <div className="text-sm text-gray-400 mt-1">
+                        <div className="text-base text-gray-400 mt-1">
                           ≈ ${getUSDEquivalent(toAmount, toToken)}
                         </div>
                       )}
@@ -791,7 +801,7 @@ export default function Main() {
                     <div className="relative">
                       <button
                         onClick={() => setShowToDropdown(!showToDropdown)}
-                        className="flex items-center gap-3 bg-gray-800 hover:bg-gray-700 rounded-2xl px-4 py-3 transition-all duration-200 border border-gray-600 hover:border-gray-500 shadow-lg"
+                        className="flex items-center gap-4 bg-gray-800 hover:bg-gray-700 rounded-2xl px-5 py-4 transition-all duration-200 border border-gray-600 hover:border-gray-500 shadow-lg"
                       >
                         {toToken ? (
                           <>
@@ -799,7 +809,7 @@ export default function Main() {
                               <img 
                                 src={getTokenLogo(toToken, getTokenChain(toToken))} 
                                 alt={toToken}
-                                className="w-8 h-8 rounded-full"
+                                className="w-10 h-10 rounded-full"
                                 onError={(e) => {
                                   e.target.src = "https://via.placeholder.com/32x32/666666/ffffff?text=" + toToken;
                                 }}
@@ -808,7 +818,7 @@ export default function Main() {
                                 <img 
                                   src={getChainLogo(getTokenChain(toToken))} 
                                   alt={getTokenChain(toToken)}
-                                  className="w-2.5 h-2.5 rounded-full"
+                                  className="w-3 h-3 rounded-full"
                                   onError={(e) => {
                                     e.target.style.display = 'none';
                                   }}
@@ -822,7 +832,7 @@ export default function Main() {
                         ) : (
                           <span className="text-white font-medium">Select token</span>
                         )}
-                        <svg className="w-4 h-4 text-gray-400 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-gray-400 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
@@ -899,8 +909,8 @@ export default function Main() {
               </div>
 
               {/* Exchange Info - Inside Main Box */}
-              <div className="bg-gray-700/30 rounded-xl p-5 mb-7">
-                <div className="space-y-2 text-sm">
+              <div className="bg-gray-700/30 rounded-xl p-6 mb-8">
+                <div className="space-y-3 text-base">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400">Rate:</span>
                     <span className="text-white font-medium">
@@ -929,13 +939,17 @@ export default function Main() {
                       )}
                     </span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">$PGS mint:</span>
+                    <span className="text-white font-medium">20.999</span>
+                  </div>
                 </div>
               </div>
 
               {/* Swap Status Display */}
               {swapStatus && (
-                <div className="bg-blue-500/20 border border-blue-400/30 rounded-xl p-3 mb-4">
-                  <div className="text-center text-blue-300 text-sm font-medium">
+                <div className="bg-blue-500/20 border border-blue-400/30 rounded-xl p-4 mb-5">
+                  <div className="text-center text-blue-300 text-base font-medium">
                     {swapStatus}
                   </div>
                 </div>
@@ -945,7 +959,7 @@ export default function Main() {
               <button
                 onClick={handleSwap}
                 disabled={swapping}
-                className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-colors shadow-lg ${
+                className={`w-full py-5 px-8 rounded-xl font-bold text-xl transition-colors shadow-lg ${
                   swapping 
                     ? 'bg-gray-600 cursor-not-allowed text-gray-300' 
                     : walletConnected
@@ -962,25 +976,14 @@ export default function Main() {
               </button>
             </div>
             
-            {/* Leaderboard Card underneath swap UI */}
-            <div className="scale-85 w-[572px] min-w-[572px] max-w-[572px] -mt-8">
-              <div className="relative w-full">
-                <div className="relative bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-purple-600/20 backdrop-blur-md border border-white/20 rounded-2xl p-6 shadow-2xl h-28">
-                  
-                  {/* Glowing border effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-400/30 via-pink-400/30 to-purple-500/30 rounded-2xl blur-sm -z-10 opacity-60"></div>
-                  
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Right Side - Picture - More to the right */}
-          <div className="w-2/3 flex items-center justify-end mr-16">
+          <div className="flex items-center justify-start ml-20">
             <img 
-              src="/default.png" 
+              src="/pegasus.svg" 
               alt="PegaSwap" 
-              className="max-w-full h-auto object-contain scale-[142.5%] transition-transform duration-300 hover:scale-150"
+              className="h-[720px] w-auto object-contain"
             />
           </div>
         </div>

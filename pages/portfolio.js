@@ -137,27 +137,37 @@ export default function Portfolio() {
     <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen bg-gray-900`}>
       {/* Dark Navbar */}
       <nav className="bg-gray-800/50 backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
-        <div className="max-w-full px-8 py-6">
+        <div className="max-w-full px-40 py-6">
           <div className="flex items-center justify-between h-12">
             {/* Left side - Title and Nav Links */}
-            <div className="flex items-center gap-8">
+            <div className="flex items-center gap-20">
               {/* Title */}
+              <img 
+                src="/title.svg"
+                alt="PegaSwap"
+                onClick={() => window.location.href = '/main'}
+                className="h-12 scale-150 cursor-pointer hover:opacity-80 transition-opacity duration-200"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextElementSibling.style.display = 'block';
+                }}
+              />
               <h1 
                 onClick={() => window.location.href = '/main'}
-                className="text-4xl font-bold text-white cursor-pointer hover:text-gray-200 transition-colors"
+                className="text-4xl font-bold text-white cursor-pointer hover:text-gray-200 transition-colors hidden"
               >
                 PegaSwap
               </h1>
               
               {/* Navigation Links */}
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-6 transform translate-y-1">
                 <a 
                   href="/portfolio"
-                  className="text-lg font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200"
+                  className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200"
                 >
                   Portfolio
                 </a>
-                <span className="text-lg font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 cursor-pointer">
+                <span className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 cursor-pointer">
                   NFT
                 </span>
               </div>
