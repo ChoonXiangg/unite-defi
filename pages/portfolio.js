@@ -278,7 +278,7 @@ export default function Portfolio() {
                       )}
                       {isLive && (
                         <div className="text-xs text-green-400">
-                          ● Live price from 1inch
+                          ● Live price from CoinGecko
                         </div>
                       )}
                     </div>
@@ -286,7 +286,7 @@ export default function Portfolio() {
                   
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <div className="text-sm text-gray-400">Real-Time Price (1inch)</div>
+                      <div className="text-sm text-gray-400">Real-Time Price (CoinGecko)</div>
                       <div className="text-xl font-bold text-white">
                         {priceLoading ? (
                           <div className="animate-pulse bg-gray-700 h-6 w-20 rounded"></div>
@@ -324,7 +324,7 @@ export default function Portfolio() {
                     }`}></div>
                     <span>
                       {isLive 
-                        ? 'Live price updates via 1inch API' 
+                        ? 'Live price updates via CoinGecko API' 
                         : usingFallback 
                           ? 'Using fallback prices' 
                           : 'Price service unavailable'

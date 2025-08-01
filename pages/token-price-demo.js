@@ -12,26 +12,22 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Supported tokens with their contract addresses and CoinGecko IDs
+// Supported tokens with their CoinGecko IDs
 const supportedTokens = [
   {
     name: 'ETH',
-    address: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
     coinGeckoId: 'ethereum'
   },
   {
     name: 'BTC',
-    address: '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599', // WBTC
     coinGeckoId: 'bitcoin'
   },
   {
     name: 'USDC',
-    address: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
     coinGeckoId: 'usd-coin'
   },
   {
     name: 'LINK',
-    address: '0x514910771af9ca656af840dff83e8264ecf986ca',
     coinGeckoId: 'chainlink'
   }
 ];
@@ -40,14 +36,13 @@ export default function TokenPriceDemo() {
   const [selectedToken, setSelectedToken] = useState(supportedTokens[0]);
   const [customToken, setCustomToken] = useState({
     name: '',
-    address: '',
     coinGeckoId: ''
   });
   const [showCustomInput, setShowCustomInput] = useState(false);
 
   const handleCustomTokenSubmit = (e) => {
     e.preventDefault();
-    if (customToken.name && customToken.address && customToken.coinGeckoId) {
+    if (customToken.name && customToken.coinGeckoId) {
       setSelectedToken(customToken);
       setShowCustomInput(false);
     }
@@ -126,13 +121,6 @@ export default function TokenPriceDemo() {
                   />
                   <input
                     type="text"
-                    placeholder="Token Address (0x...)"
-                    value={customToken.address}
-                    onChange={(e) => setCustomToken(prev => ({ ...prev, address: e.target.value }))}
-                    className="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                  />
-                  <input
-                    type="text"
                     placeholder="CoinGecko ID (e.g., ethereum)"
                     value={customToken.coinGeckoId}
                     onChange={(e) => setCustomToken(prev => ({ ...prev, coinGeckoId: e.target.value }))}
@@ -154,7 +142,7 @@ export default function TokenPriceDemo() {
               <div className="space-y-2 text-sm">
                 <div>
                   <span className="text-gray-400">Real-time Price:</span>
-                  <span className="text-green-400 ml-2">1inch Aggregation API</span>
+                  <span className="text-green-400 ml-2">CoinGecko API</span>
                 </div>
                 <div>
                   <span className="text-gray-400">Historical Chart:</span>
@@ -175,9 +163,8 @@ export default function TokenPriceDemo() {
           {/* Real-Time Price Component */}
           <div>
             <RealTimeTokenPrice 
-              key={`${selectedToken.name}-${selectedToken.address}`}
+              key={`${selectedToken.name}-${selectedToken.coinGeckoId}`}
               tokenName={selectedToken.name}
-              fromToken={selectedToken.address}
               coinGeckoId={selectedToken.coinGeckoId}
             />
           </div>

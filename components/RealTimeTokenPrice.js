@@ -26,8 +26,6 @@ ChartJS.register(
 
 const RealTimeTokenPrice = ({ 
   tokenName = 'ETH',
-  fromToken = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-  toToken = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
   coinGeckoId = 'ethereum'
 }) => {
   const [currentPrice, setCurrentPrice] = useState(null);
@@ -37,10 +35,10 @@ const RealTimeTokenPrice = ({
   const [error, setError] = useState(null);
   const intervalRef = useRef(null);
 
-  // Fetch real-time price from 1inch
+  // Fetch real-time price from CoinGecko
   const fetchRealTimePrice = async () => {
     try {
-      const response = await fetch(`/api/price/realtime-1inch?fromToken=${fromToken}&toToken=${toToken}&chainId=1`);
+      const response = await fetch(`/api/price/realtime-coingecko?coinId=${coinGeckoId}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -55,14 +53,25 @@ const RealTimeTokenPrice = ({
       } else if (data.usingFallback) {
         setCurrentPrice(data.price);
         setLastUpdated(new Date(data.timestamp));
-        setError(data.fallbackMessage || 'Using fallback price');
+        setError(data.fallbackMessage || 'Using fallback price from CoinGecko');
       } else {
         throw new Error(data.error || 'Unknown API error');
       }
     } catch (err) {
       console.error('Error fetching real-time price:', err);
       setError('Network error - using fallback price');
-      setCurrentPrice(2450); // Fallback
+      
+      // Set fallback price based on token
+      const fallbackPrices = {
+        'ethereum': 2450,
+        'bitcoin': 45000,
+        'usd-coin': 1,
+        'tether': 1,
+        'matic-network': 0.8,
+        'binancecoin': 320,
+        'avalanche-2': 25
+      };
+      setCurrentPrice(fallbackPrices[coinGeckoId] || 100);
     }
   };
 
@@ -123,7 +132,7 @@ const RealTimeTokenPrice = ({
     };
 
     initializeData();
-  }, [fromToken, toToken, coinGeckoId]);
+  }, [coinGeckoId]);
 
   // Set up real-time price polling (every 5 seconds)
   useEffect(() => {
@@ -138,7 +147,7 @@ const RealTimeTokenPrice = ({
         }
       };
     }
-  }, [loading, fromToken, toToken]);
+  }, [loading, coinGeckoId]);
 
   // Chart options
   const chartOptions = {
