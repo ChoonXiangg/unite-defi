@@ -20,6 +20,61 @@ export default function NFT() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
 
+  // Owned NFTs (colored/normal display)
+  const ownedNFTs = [
+    'fire pegasus.svg',
+    'air body.svg',
+    'water head.svg',
+    'rainbow wing.svg'
+  ];
+
+  // Unowned NFTs (greyscale) - organized by type and element
+  const unownedNFTs = [
+    // Complete pegasus first
+    'air pegasus.svg',
+    'earth pegasus.svg', 
+    'rainbow pegasus.svg',
+    'water pegasus.svg',
+    
+    // Air element parts (excluding owned)
+    'air head.svg',
+    'air horm.svg',
+    'air leg.svg',
+    'air tail.svg',
+    'air wing.svg',
+    
+    // Earth element parts
+    'earth body.svg',
+    'earth head.svg',
+    'earth horn.svg',
+    'earth leg.svg',
+    'earth tail.svg',
+    'earth wing.svg',
+    
+    // Fire element parts (excluding owned pegasus)
+    'fire body.svg',
+    'fire head.svg',
+    'fire horn.svg',
+    'fire leg.svg',
+    'fire tail.svg',
+    'fire wing.svg',
+    
+    // Rainbow element parts (excluding owned wing)
+    'rainbow body.svg',
+    'rainbow head.svg',
+    'rainbow horn.svg',
+    'rainbow leg.svg',
+    'rainbow tail.svg',
+    
+    // Water element parts (excluding owned head)
+    'water body.svg',
+    'water horn.svg',
+    'water leg.svg',
+    'water pegasus.svg',
+    'water tail.svg',
+    'water wing.svg'
+  ];
+
   useEffect(() => {
     // Check if wallet is already connected
     const checkWalletConnection = async () => {
@@ -115,52 +170,93 @@ export default function NFT() {
       </nav>
 
       {/* Main Content */}
-      <div className="flex items-center justify-center min-h-[calc(100vh-120px)] p-8">
-        <div className="text-center">
-          {/* Chest Container */}
-          <div className="relative">
-            <div 
-              className="chest-container relative w-64 h-48 mx-auto cursor-pointer"
-              onClick={handleChestClick}
-            >
-              {/* Closed chest */}
-              <div 
-                className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ease-in-out ${
-                  isChestOpen ? 'opacity-0' : 'opacity-100'
-                }`}
-              >
-                <img 
-                  src="/close-chest-original.svg" 
-                  alt="Closed Chest" 
-                  className="w-40 h-30 object-contain"
-                />
+      <div className="main-content flex min-h-[calc(100vh-120px)] p-8 gap-8">
+        {/* Left Side - Collections */}
+        <div className="collections-sidebar w-1/2">
+          <div className="bg-gray-800/90 rounded-2xl border border-gray-600/50 backdrop-blur-md shadow-xl overflow-hidden">
+            <div className="p-6 border-b border-gray-700">
+              <h2 className="text-xl font-bold text-white mb-2 font-supercell">Collections</h2>
+              <div className="text-sm text-gray-400">{pegasusCollection.length} items</div>
+            </div>
+            <div className="p-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+              <div className="collections-grid grid grid-cols-4 gap-3">
+                {pegasusCollection.map((item, index) => {
+                  const itemName = item.replace('.svg', '').replace(/\b\w/g, l => l.toUpperCase());
+                  return (
+                    <div 
+                      key={index}
+                      className="bg-gray-700/50 rounded-lg border border-gray-600/30 p-3 hover:bg-gray-600/50 transition-colors cursor-pointer"
+                    >
+                      <div className="aspect-square mb-2">
+                        <img 
+                          src={`/pegasus/${item}`}
+                          alt={itemName}
+                          className="w-full h-full object-contain"
+                          style={{ filter: 'grayscale(100%)' }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                      <div className="text-xs text-gray-300 text-center font-supercell truncate">
+                        {itemName}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              
-              {/* Open chest */}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side - Chest Container */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            {/* Chest Container */}
+            <div className="relative">
               <div 
-                className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ease-in-out ${
-                  isChestOpen ? 'opacity-100' : 'opacity-0'
-                }`}
+                className="chest-container relative w-64 h-48 mx-auto cursor-pointer"
+                onClick={handleChestClick}
               >
-                <img 
-                  src="/open-chest-original.svg" 
-                  alt="Open Chest" 
-                  className="w-40 h-30 object-contain"
-                  style={{ transform: 'scale(1.05)' }}
-                />
+                {/* Closed chest */}
+                <div 
+                  className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ease-in-out ${
+                    isChestOpen ? 'opacity-0' : 'opacity-100'
+                  }`}
+                >
+                  <img 
+                    src="/close-chest-original.svg" 
+                    alt="Closed Chest" 
+                    className="w-40 h-30 object-contain"
+                  />
+                </div>
+                
+                {/* Open chest */}
+                <div 
+                  className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ease-in-out ${
+                    isChestOpen ? 'opacity-100' : 'opacity-0'
+                  }`}
+                >
+                  <img 
+                    src="/open-chest-original.svg" 
+                    alt="Open Chest" 
+                    className="w-40 h-30 object-contain"
+                    style={{ transform: 'scale(1.05)' }}
+                  />
+                </div>
+                
+                {/* Glow effect when open */}
+                <div 
+                  className={`absolute inset-0 rounded-full transition-opacity duration-500 ease-in-out ${
+                    isChestOpen ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  style={{
+                    background: 'radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.1) 50%, transparent 100%)',
+                    filter: 'blur(8px)',
+                    transform: 'scale(1.2)'
+                  }}
+                ></div>
               </div>
-              
-              {/* Glow effect when open */}
-              <div 
-                className={`absolute inset-0 rounded-full transition-opacity duration-500 ease-in-out ${
-                  isChestOpen ? 'opacity-100' : 'opacity-0'
-                }`}
-                style={{
-                  background: 'radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.1) 50%, transparent 100%)',
-                  filter: 'blur(8px)',
-                  transform: 'scale(1.2)'
-                }}
-              ></div>
             </div>
           </div>
         </div>
@@ -176,6 +272,21 @@ export default function NFT() {
           transform: scale(1.05);
         }
         
+        @media (max-width: 1024px) {
+          .main-content {
+            flex-direction: column;
+          }
+          
+          .collections-sidebar {
+            width: 100% !important;
+            margin-bottom: 2rem;
+          }
+          
+          .collections-grid {
+            grid-template-columns: repeat(5, 1fr) !important;
+          }
+        }
+        
         @media (max-width: 768px) {
           .chest-container {
             width: 200px !important;
@@ -185,6 +296,10 @@ export default function NFT() {
           .chest-container img {
             width: 120px !important;
             height: 90px !important;
+          }
+          
+          .collections-grid {
+            grid-template-columns: repeat(3, 1fr) !important;
           }
         }
         
@@ -197,6 +312,10 @@ export default function NFT() {
           .chest-container img {
             width: 100px !important;
             height: 75px !important;
+          }
+          
+          .collections-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
           }
         }
       `}</style>

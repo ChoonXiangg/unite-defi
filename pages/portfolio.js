@@ -175,7 +175,7 @@ export default function Portfolio() {
               <div className="flex items-center gap-8 transform translate-y-1">
                 <a 
                   href="/portfolio"
-                  className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 font-supercell"
+                  className="text-xl font-semibold text-white hover:scale-[1.02] transition-all duration-200 font-supercell"
                 >
                   Portfolio
                 </a>
