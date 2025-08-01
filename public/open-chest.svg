@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" width="200" height="150">
+  <!-- Chest base -->
+  <rect x="30" y="80" width="140" height="60" rx="8" ry="8" fill="#8B4513" stroke="#654321" stroke-width="2"/>
+  
+  <!-- Chest lid (open/tilted back) -->
+  <ellipse cx="100" cy="45" rx="70" ry="35" fill="#A0522D" stroke="#654321" stroke-width="2" transform="rotate(-45 100 45)"/>
+  
+  <!-- Chest corner reinforcements -->
+  <rect x="25" y="75" width="10" height="70" rx="5" fill="#654321"/>
+  <rect x="165" y="75" width="10" height="70" rx="5" fill="#654321"/>
+  
+  <!-- Inside of chest (treasure glow) -->
+  <rect x="35" y="85" width="130" height="50" rx="5" fill="#FFD700" opacity="0.3"/>
+  
+  <!-- Treasure items inside -->
+  <circle cx="70" cy="105" r="8" fill="#FFD700"/>
+  <circle cx="90" cy="110" r="6" fill="#FF6B6B"/>
+  <circle cx="110" cy="105" r="7" fill="#4ECDC4"/>
+  <circle cx="130" cy="108" r="5" fill="#45B7D1"/>
+  
+  <!-- Sparkles -->
+  <g fill="#FFD700" opacity="0.8">
+    <polygon points="60,90 62,95 67,95 63,99 65,104 60,101 55,104 57,99 53,95 58,95" transform="scale(0.5)"/>
+    <polygon points="140,85 142,90 147,90 143,94 145,99 140,96 135,99 137,94 133,90 138,90" transform="scale(0.4)"/>
+    <polygon points="120,80 122,85 127,85 123,89 125,94 120,91 115,94 117,89 113,85 118,85" transform="scale(0.3)"/>
+  </g>
+  
+  <!-- Chest bands -->
+  <rect x="30" y="90" width="140" height="4" fill="#654321"/>
+  <rect x="30" y="110" width="140" height="4" fill="#654321"/>
+  <rect x="30" y="130" width="140" height="4" fill="#654321"/>
+  
+  <!-- Broken lock -->
+  <rect x="45" y="140" width="15" height="8" rx="2" fill="#FFD700" stroke="#B8860B" stroke-width="1" transform="rotate(15 52 144)"/>
+</svg>

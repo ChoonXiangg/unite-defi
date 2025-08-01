@@ -597,9 +597,12 @@ export default function Main() {
                 >
                   Portfolio
                 </a>
-                <span className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 cursor-pointer font-supercell">
+                <a 
+                  href="/nft"
+                  className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 font-supercell"
+                >
                   NFT
-                </span>
+                </a>
               </div>
             </div>
             

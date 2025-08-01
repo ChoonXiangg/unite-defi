@@ -1,521 +1,205 @@
 import { useState, useEffect } from 'react';
+import { Geist, Geist_Mono } from "next/font/google";
+import { WalletService } from "../utils/walletUtils";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export default function NFT() {
-  const [activeWallet, setActiveWallet] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('mint');
-  const [contracts, setContracts] = useState([]);
-  const [userNFTs, setUserNFTs] = useState([]);
-
-
-  // Mint NFT form
-  const [mintForm, setMintForm] = useState({
-    contractAddress: '0x176E38D94AD24022fDb813E8F3f3fe10Fde17249',
-    recipient: '',
-    name: '',
-    description: '',
-    image: '',
-    attributes: []
-  });
-
-  // Batch mint form
-  const [batchMintForm, setBatchMintForm] = useState({
-    contractAddress: '0x176E38D94AD24022fDb813E8F3f3fe10Fde17249',
-    nftData: [{ recipient: '', name: '', description: '', image: '', attributes: [] }]
-  });
-
+  const [isChestOpen, setIsChestOpen] = useState(false);
+  
+  // Wallet states
+  const [walletService] = useState(() => new WalletService());
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState(null);
 
   useEffect(() => {
-    // Check if wallet is unlocked (you can get this from localStorage or context)
-    const savedWallet = localStorage.getItem('activeWallet');
-    if (savedWallet) {
-      setActiveWallet(JSON.parse(savedWallet));
-      loadUserContracts();
-      loadUserNFTs();
-    }
-  }, []);
-
-  const loadUserContracts = async () => {
-    const savedWallet = localStorage.getItem('activeWallet');
-    if (!savedWallet) return;
-
-    const wallet = JSON.parse(savedWallet);
+    // Check if wallet is already connected
+    const checkWalletConnection = async () => {
+      if (window.ethereum && window.ethereum.selectedAddress) {
+        try {
+          const { address } = await walletService.connectWallet();
+          setWalletConnected(true);
+          setWalletAddress(address);
+        } catch (error) {
+          console.log('Wallet auto-connection failed:', error);
+        }
+      }
+    };
     
-    try {
-      const response = await fetch('/api/nft/user-contracts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletId: wallet.walletId,
-          password: wallet.password
-        })
-      });
+    checkWalletConnection();
+  }, [walletService]);
 
-      const data = await response.json();
-      if (data.success) {
-        setContracts(data.contracts);
-      }
-    } catch (error) {
-      console.error('Failed to load contracts:', error);
-    }
+  const handleChestClick = () => {
+    setIsChestOpen(!isChestOpen);
   };
-
-  const loadUserNFTs = async () => {
-    const savedWallet = localStorage.getItem('activeWallet');
-    if (!savedWallet) return;
-
-    const wallet = JSON.parse(savedWallet);
-    
-    try {
-      const response = await fetch('/api/nft/user-nfts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletId: wallet.walletId,
-          password: wallet.password
-        })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setUserNFTs(data.nfts);
-      }
-    } catch (error) {
-      console.error('Failed to load NFTs:', error);
-    }
-  };
-
-
-
-  const mintNFT = async () => {
-    if (!activeWallet || !mintForm.contractAddress || !mintForm.recipient || !mintForm.name) {
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await fetch('/api/nft/mint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletId: activeWallet.walletId,
-          password: activeWallet.password,
-          ...mintForm
-        })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        alert(`NFT minted successfully!\nToken ID: ${data.nft.tokenId}\nTransaction: ${data.nft.transactionHash}`);
-        setMintForm({
-          contractAddress: '0x176E38D94AD24022fDb813E8F3f3fe10Fde17249',
-          recipient: '',
-          name: '',
-          description: '',
-          image: '',
-          attributes: []
-        });
-        loadUserNFTs();
-      } else {
-        alert('Minting failed: ' + data.error);
-      }
-    } catch (error) {
-      alert('Error minting NFT: ' + error.message);
-    }
-    setLoading(false);
-  };
-
-  const addBatchMintEntry = () => {
-    setBatchMintForm(prev => ({
-      ...prev,
-      nftData: [...prev.nftData, { recipient: '', name: '', description: '', image: '', attributes: [] }]
-    }));
-  };
-
-  const removeBatchMintEntry = (index) => {
-    setBatchMintForm(prev => ({
-      ...prev,
-      nftData: prev.nftData.filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateBatchMintEntry = (index, field, value) => {
-    setBatchMintForm(prev => ({
-      ...prev,
-      nftData: prev.nftData.map((item, i) => 
-        i === index ? { ...item, [field]: value } : item
-      )
-    }));
-  };
-
-  const batchMintNFTs = async () => {
-    if (!activeWallet || !batchMintForm.contractAddress || batchMintForm.nftData.length === 0) {
-      alert('Please fill in contract address and at least one NFT');
-      return;
-    }
-
-    // Validate all entries have required fields
-    const invalidEntries = batchMintForm.nftData.filter(nft => !nft.recipient || !nft.name);
-    if (invalidEntries.length > 0) {
-      alert('All NFTs must have recipient and name filled in');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const recipients = batchMintForm.nftData.map(nft => nft.recipient);
-      const nftData = batchMintForm.nftData.map(({ recipient, ...rest }) => rest);
-
-      const response = await fetch('/api/nft/batch-mint', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletId: activeWallet.walletId,
-          password: activeWallet.password,
-          contractAddress: batchMintForm.contractAddress,
-          recipients,
-          nftData
-        })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        alert(`Batch mint successful!\n${data.batch.batchSize} NFTs minted\nTotal gas used: ${data.batch.totalGasUsed}`);
-        setBatchMintForm({
-          contractAddress: '0x176E38D94AD24022fDb813E8F3f3fe10Fde17249',
-          nftData: [{ recipient: '', name: '', description: '', image: '', attributes: [] }]
-        });
-        loadUserNFTs();
-      } else {
-        alert('Batch minting failed: ' + data.error);
-      }
-    } catch (error) {
-      alert('Error batch minting NFTs: ' + error.message);
-    }
-    setLoading(false);
-  };
-
-  if (!activeWallet) {
-    return (
-      <div className="min-h-screen relative flex items-center justify-center font-sans" style={{
-        background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)'
-      }}>
-        <div className="bg-gray-800/90 backdrop-blur-md rounded-2xl p-8 border border-gray-600/50 shadow-xl text-center">
-          <h1 className="text-3xl font-bold text-white mb-4">NFT Creator</h1>
-          <p className="text-gray-300 mb-6">Please unlock a wallet first to access NFT features.</p>
-          <a href="/wallet" className="text-blue-400 hover:text-blue-300 transition-colors font-medium">
-            Go to Wallet Page →
-          </a>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen relative font-sans" style={{
-      background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)',
-      padding: '20px'
+    <div className={`${geistSans.className} ${geistMono.className} min-h-screen relative`} style={{
+      background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)'
     }}>
       
-      {/* Navbar with same styling as swap UI */}
-      <nav className="bg-gray-800/90 backdrop-blur-md border-b border-gray-600/50 sticky top-0 z-50 shadow-xl -mx-5 -mt-5 mb-5 px-10 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <h1 className="text-2xl font-bold text-white">NFT Creator</h1>
-            <span className="text-sm text-gray-300">Arbitrum Sepolia</span>
-          </div>
-          <div className="text-sm text-gray-300">
-            <strong>Active Wallet:</strong> {activeWallet.addresses?.evm}
+      {/* Navbar with same styling as other pages */}
+      <nav className="bg-gray-800/90 backdrop-blur-md border-b border-gray-600/50 sticky top-0 z-50 shadow-xl">
+        <div className="max-w-full px-40 py-6">
+          <div className="flex items-center justify-between h-12">
+            {/* Left side - Title and Nav Links */}
+            <div className="flex items-center gap-20">
+              {/* Title */}
+              <img 
+                src="/title.svg"
+                alt="PegaSwap"
+                onClick={() => window.location.href = '/main'}
+                className="h-12 scale-150 cursor-pointer hover:opacity-80 transition-opacity duration-200"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextElementSibling.style.display = 'block';
+                }}
+              />
+              <h1 
+                onClick={() => window.location.href = '/main'}
+                className="text-4xl font-bold text-white cursor-pointer hover:text-gray-200 transition-colors hidden"
+              >
+                PegaSwap
+              </h1>
+              
+              {/* Navigation Links */}
+              <div className="flex items-center gap-8 transform translate-y-1">
+                <a 
+                  href="/portfolio"
+                  className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 font-supercell"
+                >
+                  Portfolio
+                </a>
+                <a 
+                  href="/nft"
+                  className="text-xl font-semibold text-white hover:scale-[1.02] transition-all duration-200 font-supercell"
+                >
+                  NFT
+                </a>
+              </div>
+            </div>
+            
+            {/* Wallet & Settings - Right */}
+            <div className="flex items-center gap-4">
+              {/* Wallet Address Box */}
+              <div className="bg-gray-700/80 backdrop-blur-sm rounded-lg px-4 py-2 border border-gray-600 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${walletConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-sm font-mono text-gray-300">
+                    {walletConnected 
+                      ? `${walletAddress?.slice(0, 6)}...${walletAddress?.slice(-4)}`
+                      : 'Not Connected'
+                    }
+                  </span>
+                </div>
+              </div>
+              
+              {/* Settings Icon */}
+              <button className="bg-gray-700/80 backdrop-blur-sm rounded-lg p-2 border border-gray-600 shadow-sm hover:bg-gray-600/90 transition-colors">
+                <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </nav>
 
-      {/* Tabs */}
-      <div style={{ marginBottom: '20px' }}>
-        <button 
-          onClick={() => setActiveTab('mint')}
-          style={{ 
-            padding: '10px 20px', 
-            marginRight: '10px',
-            backgroundColor: activeTab === 'mint' ? '#007bff' : '#f8f9fa',
-            color: activeTab === 'mint' ? 'white' : 'black',
-            border: '1px solid #ddd'
-          }}
-        >
-          Mint NFT
-        </button>
-        <button 
-          onClick={() => setActiveTab('batch')}
-          style={{ 
-            padding: '10px 20px', 
-            marginRight: '10px',
-            backgroundColor: activeTab === 'batch' ? '#007bff' : '#f8f9fa',
-            color: activeTab === 'batch' ? 'white' : 'black',
-            border: '1px solid #ddd'
-          }}
-        >
-          Batch Mint
-        </button>
-        <button 
-          onClick={() => setActiveTab('manage')}
-          style={{ 
-            padding: '10px 20px',
-            backgroundColor: activeTab === 'manage' ? '#007bff' : '#f8f9fa',
-            color: activeTab === 'manage' ? 'white' : 'black',
-            border: '1px solid #ddd'
-          }}
-        >
-          Manage NFTs
-        </button>
-      </div>
-
-      {/* Contract Info */}
-      <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f8f9fa', border: '1px solid #ddd', borderRadius: '5px' }}>
-        <h3>📋 Deployed Contract</h3>
-        <p><strong>Contract:</strong> Unite DeFi NFT (UNITE)</p>
-        <p><strong>Address:</strong> 0x176E38D94AD24022fDb813E8F3f3fe10Fde17249</p>
-        <p><strong>Network:</strong> Arbitrum Sepolia</p>
-        <p><strong>Verify:</strong> <a href="https://sepolia.arbiscan.io/address/0x176E38D94AD24022fDb813E8F3f3fe10Fde17249" target="_blank" rel="noopener noreferrer">View on Arbiscan</a></p>
-      </div>
-
-      {/* Mint NFT Tab */}
-      {activeTab === 'mint' && (
-        <div>
-          <h2>Mint Single NFT</h2>
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Contract Address *</label><br />
-              <select
-                value={mintForm.contractAddress}
-                onChange={(e) => setMintForm(prev => ({ ...prev, contractAddress: e.target.value }))}
-                style={{ width: '300px', padding: '5px' }}
-              >
-                <option value="">Select a contract</option>
-                {contracts.map(contract => (
-                  <option key={contract.contractAddress} value={contract.contractAddress}>
-                    {contract.name} ({contract.symbol})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Recipient Address *</label><br />
-              <input
-                type="text"
-                value={mintForm.recipient}
-                onChange={(e) => setMintForm(prev => ({ ...prev, recipient: e.target.value }))}
-                style={{ width: '300px', padding: '5px' }}
-                placeholder="0x..."
-              />
-            </div>
-            <div style={{ marginBottom: '10px' }}>
-              <label>NFT Name *</label><br />
-              <input
-                type="text"
-                value={mintForm.name}
-                onChange={(e) => setMintForm(prev => ({ ...prev, name: e.target.value }))}
-                style={{ width: '300px', padding: '5px' }}
-                placeholder="My Awesome NFT"
-              />
-            </div>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Description</label><br />
-              <textarea
-                value={mintForm.description}
-                onChange={(e) => setMintForm(prev => ({ ...prev, description: e.target.value }))}
-                style={{ width: '300px', padding: '5px', height: '60px' }}
-                placeholder="NFT description..."
-              />
-            </div>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Image URL</label><br />
-              <input
-                type="text"
-                value={mintForm.image}
-                onChange={(e) => setMintForm(prev => ({ ...prev, image: e.target.value }))}
-                style={{ width: '300px', padding: '5px' }}
-                placeholder="https://example.com/image.png"
-              />
-            </div>
-            <button 
-              onClick={mintNFT}
-              disabled={loading || !mintForm.contractAddress || !mintForm.recipient || !mintForm.name}
-              style={{ padding: '8px 16px', backgroundColor: '#007bff', color: 'white' }}
+      {/* Main Content */}
+      <div className="flex items-center justify-center min-h-[calc(100vh-120px)] p-8">
+        <div className="text-center">
+          {/* Chest Container */}
+          <div className="relative">
+            <div 
+              className="chest-container relative w-64 h-48 mx-auto cursor-pointer"
+              onClick={handleChestClick}
             >
-              {loading ? 'Minting...' : 'Mint NFT'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Batch Mint Tab */}
-      {activeTab === 'batch' && (
-        <div>
-          <h2>Batch Mint NFTs</h2>
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Contract Address *</label><br />
-              <select
-                value={batchMintForm.contractAddress}
-                onChange={(e) => setBatchMintForm(prev => ({ ...prev, contractAddress: e.target.value }))}
-                style={{ width: '300px', padding: '5px' }}
+              {/* Closed chest */}
+              <div 
+                className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ease-in-out ${
+                  isChestOpen ? 'opacity-0' : 'opacity-100'
+                }`}
               >
-                <option value="">Select a contract</option>
-                {contracts.map(contract => (
-                  <option key={contract.contractAddress} value={contract.contractAddress}>
-                    {contract.name} ({contract.symbol})
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <h3>NFTs to Mint ({batchMintForm.nftData.length})</h3>
-            {batchMintForm.nftData.map((nft, index) => (
-              <div key={index} style={{ 
-                border: '1px solid #ddd', 
-                padding: '10px', 
-                marginBottom: '10px',
-                backgroundColor: '#f9f9f9'
-              }}>
-                <h4>NFT #{index + 1}</h4>
-                <div style={{ marginBottom: '5px' }}>
-                  <input
-                    type="text"
-                    value={nft.recipient}
-                    onChange={(e) => updateBatchMintEntry(index, 'recipient', e.target.value)}
-                    style={{ width: '250px', padding: '3px', marginRight: '10px' }}
-                    placeholder="Recipient address"
-                  />
-                  <input
-                    type="text"
-                    value={nft.name}
-                    onChange={(e) => updateBatchMintEntry(index, 'name', e.target.value)}
-                    style={{ width: '150px', padding: '3px' }}
-                    placeholder="NFT name"
-                  />
-                </div>
-                <div style={{ marginBottom: '5px' }}>
-                  <textarea
-                    value={nft.description}
-                    onChange={(e) => updateBatchMintEntry(index, 'description', e.target.value)}
-                    style={{ width: '300px', padding: '3px', height: '40px' }}
-                    placeholder="Description"
-                  />
-                </div>
-                <div style={{ marginBottom: '5px' }}>
-                  <input
-                    type="text"
-                    value={nft.image}
-                    onChange={(e) => updateBatchMintEntry(index, 'image', e.target.value)}
-                    style={{ width: '300px', padding: '3px' }}
-                    placeholder="Image URL"
-                  />
-                </div>
-                {batchMintForm.nftData.length > 1 && (
-                  <button 
-                    onClick={() => removeBatchMintEntry(index)}
-                    style={{ backgroundColor: '#dc3545', color: 'white', padding: '3px 8px' }}
-                  >
-                    Remove
-                  </button>
-                )}
+                <img 
+                  src="/close-chest-original.svg" 
+                  alt="Closed Chest" 
+                  className="w-40 h-30 object-contain"
+                />
               </div>
-            ))}
-            
-            <div style={{ marginBottom: '10px' }}>
-              <button 
-                onClick={addBatchMintEntry}
-                style={{ marginRight: '10px', padding: '8px 16px' }}
+              
+              {/* Open chest */}
+              <div 
+                className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ease-in-out ${
+                  isChestOpen ? 'opacity-100' : 'opacity-0'
+                }`}
               >
-                Add Another NFT
-              </button>
-              <button 
-                onClick={batchMintNFTs}
-                disabled={loading || !batchMintForm.contractAddress || batchMintForm.nftData.length === 0}
-                style={{ padding: '8px 16px', backgroundColor: '#28a745', color: 'white' }}
-              >
-                {loading ? 'Batch Minting...' : `Batch Mint ${batchMintForm.nftData.length} NFTs`}
-              </button>
+                <img 
+                  src="/open-chest-original.svg" 
+                  alt="Open Chest" 
+                  className="w-40 h-30 object-contain"
+                  style={{ transform: 'scale(1.05)' }}
+                />
+              </div>
+              
+              {/* Glow effect when open */}
+              <div 
+                className={`absolute inset-0 rounded-full transition-opacity duration-500 ease-in-out ${
+                  isChestOpen ? 'opacity-100' : 'opacity-0'
+                }`}
+                style={{
+                  background: 'radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.1) 50%, transparent 100%)',
+                  filter: 'blur(8px)',
+                  transform: 'scale(1.2)'
+                }}
+              ></div>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Manage NFTs Tab */}
-      {activeTab === 'manage' && (
-        <div>
-          <h2>Your NFT Collections</h2>
-          <div style={{ marginBottom: '30px' }}>
-            <h3>Deployed Contracts ({contracts.length})</h3>
-            {contracts.length === 0 ? (
-              <p>No contracts deployed yet</p>
-            ) : (
-              contracts.map(contract => (
-                <div key={contract.contractAddress} style={{ 
-                  border: '1px solid #ddd', 
-                  padding: '15px', 
-                  marginBottom: '10px',
-                  backgroundColor: '#f9f9f9'
-                }}>
-                  <h4>{contract.name} ({contract.symbol})</h4>
-                  <p><strong>Address:</strong> {contract.contractAddress}</p>
-                  <p><strong>Description:</strong> {contract.description}</p>
-                  <p><strong>Total Supply:</strong> {contract.totalSupply}</p>
-                  <p><strong>Deployed:</strong> {new Date(contract.deployedAt).toLocaleString()}</p>
-                  {contract.royaltyFeeBps > 0 && (
-                    <p><strong>Royalty:</strong> {(contract.royaltyFeeBps / 100).toFixed(2)}%</p>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-
-          <div>
-            <h3>Your NFTs ({userNFTs.length})</h3>
-            {userNFTs.length === 0 ? (
-              <p>No NFTs found</p>
-            ) : (
-              userNFTs.map(nft => (
-                <div key={`${nft.contractAddress}-${nft.tokenId}`} style={{ 
-                  border: '1px solid #ddd', 
-                  padding: '15px', 
-                  marginBottom: '10px',
-                  backgroundColor: '#f9f9f9'
-                }}>
-                  <h4>{nft.metadata?.metadata?.name || `Token #${nft.tokenId}`}</h4>
-                  <p><strong>Token ID:</strong> {nft.tokenId}</p>
-                  <p><strong>Contract:</strong> {nft.contractAddress}</p>
-                  <p><strong>Description:</strong> {nft.metadata?.metadata?.description}</p>
-                  {nft.metadata?.metadata?.image && (
-                    <p><strong>Image:</strong> <a href={nft.metadata.metadata.image} target="_blank" rel="noopener noreferrer">View</a></p>
-                  )}
-                  <p><strong>Minted:</strong> {new Date(nft.mintedAt).toLocaleString()}</p>
-                  <p><strong>Transaction:</strong> {nft.transactionHash}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {loading && (
-        <div style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          bottom: 0, 
-          backgroundColor: 'rgba(0,0,0,0.5)', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center' 
-        }}>
-          <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '5px' }}>
-            <p>Processing transaction...</p>
-          </div>
-        </div>
-      )}
+      {/* Custom CSS for smooth transitions */}
+      <style jsx>{`
+        .chest-container {
+          transition: all 0.3s ease-in-out;
+        }
+        
+        .chest-container:hover {
+          transform: scale(1.05);
+        }
+        
+        @media (max-width: 768px) {
+          .chest-container {
+            width: 200px !important;
+            height: 150px !important;
+          }
+          
+          .chest-container img {
+            width: 120px !important;
+            height: 90px !important;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .chest-container {
+            width: 160px !important;
+            height: 120px !important;
+          }
+          
+          .chest-container img {
+            width: 100px !important;
+            height: 75px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

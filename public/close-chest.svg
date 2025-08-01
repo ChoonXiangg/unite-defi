@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150" width="200" height="150">
+  <!-- Chest base -->
+  <rect x="30" y="80" width="140" height="60" rx="8" ry="8" fill="#8B4513" stroke="#654321" stroke-width="2"/>
+  
+  <!-- Chest lid (closed) -->
+  <ellipse cx="100" cy="80" rx="70" ry="35" fill="#A0522D" stroke="#654321" stroke-width="2"/>
+  
+  <!-- Chest corner reinforcements -->
+  <rect x="25" y="75" width="10" height="70" rx="5" fill="#654321"/>
+  <rect x="165" y="75" width="10" height="70" rx="5" fill="#654321"/>
+  
+  <!-- Lock -->
+  <rect x="90" y="85" width="20" height="15" rx="3" fill="#FFD700" stroke="#B8860B" stroke-width="1"/>
+  <circle cx="100" cy="92" r="3" fill="#B8860B"/>
+  
+  <!-- Chest bands -->
+  <rect x="30" y="90" width="140" height="4" fill="#654321"/>
+  <rect x="30" y="110" width="140" height="4" fill="#654321"/>
+  <rect x="30" y="130" width="140" height="4" fill="#654321"/>
+</svg>

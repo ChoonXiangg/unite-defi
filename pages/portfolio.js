@@ -27,6 +27,16 @@ const mockPortfolioData = [
     priceHistory: [0.520, 0.545, 0.560, 0.575, 0.583, 0.590, 0.585, 0.580, 0.583]
   },
   {
+    symbol: "PGS",
+    name: "PegaSwap",
+    balance: "2500.00",
+    value: 6750.00,
+    price: 2.70,
+    change24h: 8.5,
+    logo: "/PGS-logo-original.svg",
+    priceHistory: [2.45, 2.52, 2.61, 2.68, 2.70, 2.75, 2.72, 2.69, 2.70]
+  },
+  {
     symbol: "ETH",
     name: "Ethereum", 
     balance: "2.45",
@@ -169,9 +179,12 @@ export default function Portfolio() {
                 >
                   Portfolio
                 </a>
-                <span className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 cursor-pointer font-supercell">
+                <a 
+                  href="/nft"
+                  className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200 font-supercell"
+                >
                   NFT
-                </span>
+                </a>
               </div>
             </div>
             
@@ -225,14 +238,28 @@ export default function Portfolio() {
                         : 'border-l-transparent'
                     }`}
                   >
-                    <img 
-                      src={token.logo} 
-                      alt={token.symbol}
-                      className="w-10 h-10 rounded-full"
-                      onError={(e) => {
-                        e.target.src = `https://via.placeholder.com/40x40/666666/ffffff?text=${token.symbol}`;
-                      }}
-                    />
+                    {token.symbol === 'PGS' ? (
+                      <div className="w-10 h-10 rounded-full bg-white border border-gray-300 flex items-center justify-center">
+                        <img 
+                          src="/PGS-logo-original.svg"
+                          alt={token.symbol}
+                          className="w-12 h-12 object-contain"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerHTML = '<span class="text-xs font-bold text-gray-600">PGS</span>';
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <img 
+                        src={token.logo} 
+                        alt={token.symbol}
+                        className="w-10 h-10 rounded-full"
+                        onError={(e) => {
+                          e.target.src = `https://via.placeholder.com/40x40/666666/ffffff?text=${token.symbol}`;
+                        }}
+                      />
+                    )}
                     <div className="flex-1 text-left">
                       <div className="flex items-center gap-2">
                         <span className="text-white font-semibold font-supercell" style={{fontSize: '80%'}}>{token.symbol}</span>
@@ -265,14 +292,28 @@ export default function Portfolio() {
                 {/* Token Info Header - Updated with Real-Time Data */}
                 <div className="bg-gray-800/90 rounded-2xl p-6 border border-gray-600/50 backdrop-blur-md shadow-xl">
                   <div className="flex items-center gap-4 mb-4">
-                    <img 
-                      src={selectedToken.logo} 
-                      alt={selectedToken.symbol}
-                      className="w-12 h-12 rounded-full"
-                      onError={(e) => {
-                        e.target.src = `https://via.placeholder.com/48x48/666666/ffffff?text=${selectedToken.symbol}`;
-                      }}
-                    />
+                    {selectedToken.symbol === 'PGS' ? (
+                      <div className="w-12 h-12 rounded-full bg-white border border-gray-300 flex items-center justify-center">
+                        <img 
+                          src="/PGS-logo-original.svg"
+                          alt={selectedToken.symbol}
+                          className="w-16 h-16 object-contain"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerHTML = '<span class="text-sm font-bold text-gray-600">PGS</span>';
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <img 
+                        src={selectedToken.logo} 
+                        alt={selectedToken.symbol}
+                        className="w-12 h-12 rounded-full"
+                        onError={(e) => {
+                          e.target.src = `https://via.placeholder.com/48x48/666666/ffffff?text=${selectedToken.symbol}`;
+                        }}
+                      />
+                    )}
                     <div>
                       <h2 className="text-2xl font-bold text-white font-supercell">{selectedToken.name}</h2>
                       <div className="text-gray-400">{selectedToken.symbol}</div>
