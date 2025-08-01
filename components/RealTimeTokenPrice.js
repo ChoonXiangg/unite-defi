@@ -1,0 +1,259 @@
+import { useState, useEffect, useRef } from 'react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
+
+const RealTimeTokenPrice = ({ 
+  tokenName = 'ETH',
+  fromToken = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+  toToken = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
+  coinGeckoId = 'ethereum'
+}) => {
+  const [currentPrice, setCurrentPrice] = useState(null);
+  const [chartData, setChartData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [error, setError] = useState(null);
+  const intervalRef = useRef(null);
+
+  // Fetch real-time price from 1inch
+  const fetchRealTimePrice = async () => {
+    try {
+      const response = await fetch(`/api/price/realtime-1inch?fromToken=${fromToken}&toToken=${toToken}&chainId=1`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setCurrentPrice(data.price);
+        setLastUpdated(new Date(data.timestamp));
+        setError(null);
+      } else if (data.usingFallback) {
+        setCurrentPrice(data.price);
+        setLastUpdated(new Date(data.timestamp));
+        setError(data.fallbackMessage || 'Using fallback price');
+      } else {
+        throw new Error(data.error || 'Unknown API error');
+      }
+    } catch (err) {
+      console.error('Error fetching real-time price:', err);
+      setError('Network error - using fallback price');
+      setCurrentPrice(2450); // Fallback
+    }
+  };
+
+  // Fetch historical chart data from CoinGecko
+  const fetchChartData = async () => {
+    try {
+      const response = await fetch(`/api/price/coingecko-chart?coinId=${coinGeckoId}&days=1`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success || data.usingFallback) {
+        const prices = data.data;
+        const labels = prices.map(item => item.time);
+        const priceData = prices.map(item => item.price);
+
+        setChartData({
+          labels,
+          datasets: [
+            {
+              label: `${tokenName} Price (USD)`,
+              data: priceData,
+              borderColor: data.usingFallback ? '#f59e0b' : '#10b981',
+              backgroundColor: data.usingFallback ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.4,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              pointHoverBackgroundColor: data.usingFallback ? '#f59e0b' : '#10b981',
+              pointHoverBorderColor: '#ffffff',
+              pointHoverBorderWidth: 2
+            }
+          ]
+        });
+        
+        if (data.usingFallback) {
+          setError(prev => prev ? `${prev}; ${data.fallbackMessage}` : data.fallbackMessage);
+        }
+      } else {
+        throw new Error(data.error || 'Unknown chart API error');
+      }
+    } catch (err) {
+      console.error('Error fetching chart data:', err);
+      setError(prev => prev ? `${prev}; Chart unavailable` : 'Chart data unavailable');
+    }
+  };
+
+  // Initialize data on component mount
+  useEffect(() => {
+    const initializeData = async () => {
+      setLoading(true);
+      await Promise.all([fetchRealTimePrice(), fetchChartData()]);
+      setLoading(false);
+    };
+
+    initializeData();
+  }, [fromToken, toToken, coinGeckoId]);
+
+  // Set up real-time price polling (every 5 seconds)
+  useEffect(() => {
+    if (!loading) {
+      intervalRef.current = setInterval(() => {
+        fetchRealTimePrice();
+      }, 5000);
+
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      };
+    }
+  }, [loading, fromToken, toToken]);
+
+  // Chart options
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        backgroundColor: 'rgba(31, 41, 55, 0.9)',
+        titleColor: '#ffffff',
+        bodyColor: '#ffffff',
+        borderColor: '#6b7280',
+        borderWidth: 1,
+        displayColors: false,
+        callbacks: {
+          label: function(context) {
+            return `$${context.parsed.y.toFixed(2)}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        display: true,
+        grid: {
+          color: 'rgba(107, 114, 128, 0.2)'
+        },
+        ticks: {
+          color: '#9ca3af',
+          maxTicksLimit: 8
+        }
+      },
+      y: {
+        display: true,
+        grid: {
+          color: 'rgba(107, 114, 128, 0.2)'
+        },
+        ticks: {
+          color: '#9ca3af',
+          callback: function(value) {
+            return '$' + value.toFixed(0);
+          }
+        }
+      }
+    },
+    interaction: {
+      mode: 'nearest',
+      axis: 'x',
+      intersect: false
+    },
+    elements: {
+      point: {
+        radius: 0
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-gray-800/90 rounded-2xl p-6 border border-gray-600/50 backdrop-blur-md shadow-xl">
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-700 rounded mb-4"></div>
+          <div className="h-8 bg-gray-700 rounded mb-6"></div>
+          <div className="h-64 bg-gray-700 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-800/90 rounded-2xl p-6 border border-gray-600/50 backdrop-blur-md shadow-xl">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="text-xl font-bold text-white">{tokenName}</h3>
+          <div className="text-3xl font-bold text-green-400 mt-1">
+            ${currentPrice ? currentPrice.toFixed(2) : '--'}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xs text-gray-400">Last Updated</div>
+          <div className="text-sm text-gray-300">
+            {lastUpdated ? lastUpdated.toLocaleTimeString() : '--'}
+          </div>
+          {error && (
+            <div className="text-xs text-yellow-400 mt-1">⚠ {error}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="h-64 mb-4">
+        {chartData ? (
+          <Line data={chartData} options={chartOptions} />
+        ) : (
+          <div className="h-full flex items-center justify-center text-gray-400">
+            Chart data unavailable
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <span>24-hour price history</span>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span>Live updates every 5s</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default RealTimeTokenPrice;

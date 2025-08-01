@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Geist, Geist_Mono } from "next/font/google";
 import { WalletService } from "../utils/walletUtils";
+import RealTimeTokenPrice from "../components/RealTimeTokenPrice";
+import useRealTimePrice from "../hooks/useRealTimePrice";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -56,48 +58,23 @@ const mockPortfolioData = [
   }
 ];
 
-// Simple Line Chart Component
-const LineChart = ({ data, height = 200 }) => {
-  if (!data || data.length === 0) return null;
 
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min || 1;
+// Helper function to map token symbols to CoinGecko IDs
+const getCoinGeckoId = (symbol) => {
+  const coinGeckoMapping = {
+    'ETH': 'ethereum',
+    'BTC': 'bitcoin',
+    'USDC': 'usd-coin',
+    'USDT': 'tether',
+    'MATIC': 'matic-network',
+    'BNB': 'binancecoin',
+    'AVAX': 'avalanche-2',
+    'LINK': 'chainlink',
+    'UNI': 'uniswap',
+    'DAI': 'dai'
+  };
   
-  const points = data.map((value, index) => {
-    const x = (index / (data.length - 1)) * 100;
-    const y = ((max - value) / range) * 80 + 10; // 10% margin top/bottom
-    return `${x},${y}`;
-  }).join(' ');
-
-  const isPositive = data[data.length - 1] >= data[0];
-  const strokeColor = isPositive ? '#10b981' : '#ef4444';
-  const fillColor = isPositive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
-
-  return (
-    <div style={{ height: `${height}px` }} className="w-full">
-      <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id={`gradient-${data.length}`} x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor={strokeColor} stopOpacity="0.3"/>
-            <stop offset="100%" stopColor={strokeColor} stopOpacity="0"/>
-          </linearGradient>
-        </defs>
-        <path
-          d={`M ${points} L 100,100 L 0,100 Z`}
-          fill={`url(#gradient-${data.length})`}
-        />
-        <polyline
-          points={points}
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth="0.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </div>
-  );
+  return coinGeckoMapping[symbol?.toUpperCase()] || 'ethereum';
 };
 
 export default function Portfolio() {
@@ -108,6 +85,15 @@ export default function Portfolio() {
   const [walletService] = useState(() => new WalletService());
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
+
+  // Get real-time price for selected token
+  const { 
+    price: realTimePrice, 
+    loading: priceLoading, 
+    error: priceError, 
+    usingFallback, 
+    isLive 
+  } = useRealTimePrice(selectedToken?.symbol);
 
   useEffect(() => {
     // Sort by value and set highest as default
@@ -133,22 +119,18 @@ export default function Portfolio() {
 
   const totalValue = portfolio.reduce((sum, token) => sum + token.value, 0);
 
+  // Calculate real-time value using live Price
+  const getRealTimeValue = (token) => {
+    if (token.symbol === selectedToken?.symbol && realTimePrice && !priceLoading) {
+      return parseFloat(token.balance) * realTimePrice;
+    }
+    return token.value; // fallback to mock value
+  };
+
   return (
     <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen relative`} style={{
-      background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)',
-      backgroundSize: '200% 200%',
-      animation: 'gradientShift 6s ease-in-out infinite alternate'
+      background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)'
     }}>
-      <style jsx>{`
-        @keyframes gradientShift {
-          0% {
-            background: radial-gradient(ellipse at 20% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
-          }
-          100% {
-            background: radial-gradient(ellipse at 80% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
-          }
-        }
-      `}</style>
       
       {/* Navbar with same styling as swap UI */}
       <nav className="bg-gray-800/90 backdrop-blur-md border-b border-gray-600/50 sticky top-0 z-50 shadow-xl">
@@ -175,7 +157,7 @@ export default function Portfolio() {
               </h1>
               
               {/* Navigation Links */}
-              <div className="flex items-center gap-6 transform translate-y-1">
+              <div className="flex items-center gap-8 transform translate-y-1">
                 <a 
                   href="/portfolio"
                   className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200"
@@ -218,19 +200,14 @@ export default function Portfolio() {
       <div className="max-w-7xl mx-auto p-6">
         <div className="flex gap-6 h-screen">
           {/* Left Side - Token Holdings */}
-          <div className="w-1/3 space-y-4">
-            {/* Portfolio Summary */}
-            <div className="bg-gray-800/90 rounded-2xl p-6 border border-gray-600/50 backdrop-blur-md shadow-xl">
-              <h2 className="text-xl font-bold text-white mb-2">Total Portfolio Value</h2>
-              <div className="text-3xl font-bold text-green-400">
-                ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
-
-            {/* Token Holdings List */}
+          <div className="w-1/3">
+            {/* Combined Portfolio Summary and Holdings */}
             <div className="bg-gray-800/90 rounded-2xl border border-gray-600/50 backdrop-blur-md shadow-xl overflow-hidden">
-              <div className="p-4 border-b border-gray-700">
-                <h3 className="text-lg font-semibold text-white">Holdings</h3>
+              <div className="p-6 border-b border-gray-700">
+                <h2 className="text-xl font-bold text-white mb-2">Total Portfolio Value</h2>
+                <div className="text-3xl font-bold text-green-400 mb-4">
+                  ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
               </div>
               <div className="max-h-96 overflow-y-auto">
                 {portfolio.map((token) => (
@@ -276,11 +253,11 @@ export default function Portfolio() {
             </div>
           </div>
 
-          {/* Right Side - Chart and Token Details */}
+          {/* Right Side - Real-Time Price and Token Details */}
           <div className="flex-1 space-y-4">
             {selectedToken && (
               <>
-                {/* Token Info Header */}
+                {/* Token Info Header - Updated with Real-Time Data */}
                 <div className="bg-gray-800/90 rounded-2xl p-6 border border-gray-600/50 backdrop-blur-md shadow-xl">
                   <div className="flex items-center gap-4 mb-4">
                     <img 
@@ -294,52 +271,73 @@ export default function Portfolio() {
                     <div>
                       <h2 className="text-2xl font-bold text-white">{selectedToken.name}</h2>
                       <div className="text-gray-400">{selectedToken.symbol}</div>
+                      {(priceError || usingFallback) && (
+                        <div className="text-xs text-yellow-400">
+                          ⚠ {priceError || 'Using fallback price'}
+                        </div>
+                      )}
+                      {isLive && (
+                        <div className="text-xs text-green-400">
+                          ● Live price from 1inch
+                        </div>
+                      )}
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <div className="text-sm text-gray-400">Price</div>
+                      <div className="text-sm text-gray-400">Real-Time Price (1inch)</div>
                       <div className="text-xl font-bold text-white">
-                        ${selectedToken.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {priceLoading ? (
+                          <div className="animate-pulse bg-gray-700 h-6 w-20 rounded"></div>
+                        ) : (
+                          `$${realTimePrice?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || selectedToken.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        )}
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-400">Balance</div>
+                      <div className="text-sm text-gray-400">Balance (Mock)</div>
                       <div className="text-xl font-bold text-white">
                         {parseFloat(selectedToken.balance).toLocaleString()} {selectedToken.symbol}
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-400">Value</div>
+                      <div className="text-sm text-gray-400">Value (Real-Time)</div>
                       <div className="text-xl font-bold text-white">
-                        ${selectedToken.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {priceLoading ? (
+                          <div className="animate-pulse bg-gray-700 h-6 w-24 rounded"></div>
+                        ) : (
+                          `$${getRealTimeValue(selectedToken).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        )}
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Real-time indicator */}
+                  <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
+                    <div className={`w-2 h-2 rounded-full ${
+                      isLive 
+                        ? 'bg-green-500 animate-pulse' 
+                        : usingFallback 
+                          ? 'bg-yellow-500' 
+                          : 'bg-red-500'
+                    }`}></div>
+                    <span>
+                      {isLive 
+                        ? 'Live price updates via 1inch API' 
+                        : usingFallback 
+                          ? 'Using fallback prices' 
+                          : 'Price service unavailable'
+                      }
+                    </span>
+                  </div>
                 </div>
 
-                {/* Price Chart */}
-                <div className="bg-gray-800/90 rounded-2xl p-6 border border-gray-600/50 backdrop-blur-md shadow-xl">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-white">Price Chart</h3>
-                    <div className={`text-sm px-3 py-1 rounded-full ${
-                      selectedToken.change24h >= 0 
-                        ? 'bg-green-500/20 text-green-400' 
-                        : 'bg-red-500/20 text-red-400'
-                    }`}>
-                      {selectedToken.change24h >= 0 ? '+' : ''}{selectedToken.change24h}% (24h)
-                    </div>
-                  </div>
-                  
-                  <div className="h-64 mb-4">
-                    <LineChart data={selectedToken.priceHistory} height={250} />
-                  </div>
-                  
-                  <div className="text-xs text-gray-400 text-center">
-                    Last 9 data points
-                  </div>
-                </div>
+                {/* Real-Time Token Price Component - Moved Below Token Info */}
+                <RealTimeTokenPrice 
+                  tokenName={selectedToken?.symbol || 'ETH'}
+                  coinGeckoId={getCoinGeckoId(selectedToken?.symbol || 'ETH')}
+                />
               </>
             )}
           </div>

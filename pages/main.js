@@ -562,20 +562,8 @@ export default function Main() {
 
   return (
     <div className={`${geistSans.className} ${geistMono.className} font-sans min-h-screen relative`} style={{
-      background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)',
-      backgroundSize: '200% 200%',
-      animation: 'gradientShift 6s ease-in-out infinite alternate'
+      background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)'
     }}>
-      <style jsx>{`
-        @keyframes gradientShift {
-          0% {
-            background: radial-gradient(ellipse at 20% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
-          }
-          100% {
-            background: radial-gradient(ellipse at 80% 50%, #6f42c1 0%, #5c4ba0 50%, #58c0e0 100%);
-          }
-        }
-      `}</style>
       
       {/* Navbar with same styling as swap UI */}
       <nav className="bg-gray-800/90 backdrop-blur-md border-b border-gray-600/50 sticky top-0 z-50 shadow-xl">
@@ -602,7 +590,7 @@ export default function Main() {
               </h1>
               
               {/* Navigation Links */}
-              <div className="flex items-center gap-6 transform translate-y-1">
+              <div className="flex items-center gap-8 transform translate-y-1">
                 <a 
                   href="/portfolio"
                   className="text-xl font-semibold text-gray-300 hover:text-white hover:scale-[1.02] transition-all duration-200"
