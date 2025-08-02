@@ -40,11 +40,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Claude configuration
 .claude
 
-# Hardhat files
-/cache
-/artifacts
+# Hardhat build artifacts
+artifacts/
+cache/
 
 # TypeChain files
 /typechain
