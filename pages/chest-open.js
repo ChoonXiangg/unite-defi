@@ -190,7 +190,7 @@ export default function ChestOpen() {
             <img 
               src="/close-chest-original.svg" 
               alt="Closed Chest" 
-              className="w-48 h-36 object-contain"
+              className="w-72 h-54 object-contain"
             />
           </div>
           
@@ -203,8 +203,7 @@ export default function ChestOpen() {
             <img 
               src="/open-chest-original.svg" 
               alt="Open Chest" 
-              className="w-48 h-36 object-contain"
-              style={{ transform: 'scale(1.05)' }}
+              className="w-72 h-54 object-contain"
             />
           </div>
           
@@ -225,13 +224,13 @@ export default function ChestOpen() {
       {/* NFT Card Popup - Above Chest */}
       {drawnNFT && (
         <div 
-          className={`absolute bottom-80 left-1/2 transform -translate-x-1/2 pointer-events-none transition-all duration-700 ease-out ${
+          className={`absolute bottom-[26rem] left-1/2 transform -translate-x-1/2 pointer-events-none transition-all duration-700 ease-out ${
             showNFTCard 
               ? 'opacity-100 translate-y-0 scale-100' 
               : 'opacity-0 translate-y-8 scale-75'
           }`}
         >
-          <div className="nft-card bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600 p-1 rounded-2xl shadow-2xl pointer-events-auto">
+          <div className="nft-card bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600 p-1 rounded-2xl shadow-2xl pointer-events-auto" style={{ transform: 'scale(1.2)' }}>
             <div className="bg-gray-900 rounded-xl p-4 w-[196px]">
               {/* Card Header */}
               <div className="text-center mb-3">

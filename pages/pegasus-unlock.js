@@ -29,7 +29,24 @@ export default function PegasusUnlock() {
     router.push('/nft');
   };
 
-  const pegasusName = pegasus ? pegasus.charAt(0).toUpperCase() + pegasus.slice(1) : '';
+  const pegasusNames = {
+    fire: 'Blaze',
+    earth: 'Granite',
+    water: 'Aqua',
+    air: 'Zephyra',
+    rainbow: 'Prism'
+  };
+
+  const pegasusDisplayNames = {
+    fire: "Fire Pegasus",
+    earth: "Earth Pegasus",
+    water: "Water Pegasus",
+    air: "Air Pegasus",
+    rainbow: "Rainbow Pegasus",
+  };
+
+  const pegasusName = pegasus ? (pegasusNames[pegasus] || pegasus.charAt(0).toUpperCase() + pegasus.slice(1)) : '';
+  const pegasusDisplayName = pegasus ? (pegasusDisplayNames[pegasus] || pegasus.charAt(0).toUpperCase() + pegasus.slice(1) + ' Pegasus') : '';
 
   return (
     <div 
@@ -49,7 +66,7 @@ export default function PegasusUnlock() {
         <h2 className={`text-xl font-semibold text-white font-supercell transition-all duration-1000 ease-out delay-300 ${
           showAnimation ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-8'
         }`}>
-          You've unlocked {pegasusName} Pegasus!
+          You've unlocked {pegasusName}!
         </h2>
       </div>
 
@@ -70,7 +87,7 @@ export default function PegasusUnlock() {
               {/* Card Header */}
               <div className="text-center mb-4">
                 <h3 className="text-xl font-bold text-yellow-400 font-supercell mb-2">
-                  {pegasusName} Pegasus
+                  {pegasusName}
                 </h3>
                 <div className="w-full h-px bg-gradient-to-r from-transparent via-yellow-400 to-transparent"></div>
               </div>
@@ -90,7 +107,7 @@ export default function PegasusUnlock() {
               {/* NFT Name */}
               <div className="text-center">
                 <h4 className="text-lg font-semibold text-white font-supercell mb-2">
-                  {pegasusName} Pegasus
+                  {pegasusDisplayName}
                 </h4>
                 <p className="text-sm text-gray-400 mb-3">
                   Legendary NFT

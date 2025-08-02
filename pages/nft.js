@@ -20,6 +20,8 @@ export default function NFT() {
 
   // Owned NFTs (colored/normal display)
   const [ownedNFTs, setOwnedNFTs] = useState([]);
+  const [expandedPegasus, setExpandedPegasus] = useState(null);
+  const [equippedPegasus, setEquippedPegasus] = useState(null);
 
   // Drawable NFTs (excludes pegasus NFTs)
   const drawableNFTs = [
@@ -104,7 +106,38 @@ export default function NFT() {
   ];
 
   // Filter unowned NFTs dynamically
-  const unownedNFTs = allNFTs.filter(nft => !ownedNFTs.includes(nft));
+  const elementOrder = ['air','earth','fire','rainbow','water'];
+  const partOrder    = ['head','body','horn','leg','tail','wing'];
+
+  // Separate owned NFTs into Pegasus and body parts
+  const ownedPegasusRaw = ownedNFTs.filter(nft => nft.includes('pegasus.svg'));
+  const ownedBodyParts = ownedNFTs.filter(nft => !nft.includes('pegasus.svg'));
+  
+  // Order Pegasus with equipped one first
+  const ownedPegasus = ownedPegasusRaw.sort((a, b) => {
+    if (equippedPegasus === a) return -1;
+    if (equippedPegasus === b) return 1;
+    return 0;
+  });
+
+
+  const unownedNFTs = allNFTs
+    .filter(nft => !ownedNFTs.includes(nft))
+    .sort((a, b) => {
+      const [elemA, partA] = a.split(' ');
+      const [elemB, partB] = b.split(' ');
+      const isPegasusA = partA === 'pegasus.svg';
+      const isPegasusB = partB === 'pegasus.svg';
+      // Pegasus first
+      if (isPegasusA !== isPegasusB) return isPegasusA ? -1 : 1;
+      // Then by element order
+      const elemIndexA = elementOrder.indexOf(elemA);
+      const elemIndexB = elementOrder.indexOf(elemB);
+      if (elemIndexA !== elemIndexB) return elemIndexA - elemIndexB;
+      // Then body-part order
+      return partOrder.indexOf(partA.replace('.svg','')) 
+           - partOrder.indexOf(partB.replace('.svg',''));
+    });
 
   // Pegasus unlock detection
   const checkForPegasusUnlocks = (ownedNFTsList) => {
@@ -176,6 +209,12 @@ export default function NFT() {
       
       setOwnedNFTs(cleanedOwnedNFTs);
       
+      // Load equipped Pegasus from localStorage
+      const equippedStored = localStorage.getItem('equippedPegasus');
+      if (equippedStored && cleanedOwnedNFTs.includes(equippedStored)) {
+        setEquippedPegasus(equippedStored);
+      }
+      
       // Check for pegasus unlocks
       checkForPegasusUnlocks(cleanedOwnedNFTs);
     };
@@ -195,6 +234,20 @@ export default function NFT() {
     } else {
       // Still have NFTs to collect, go to chest page
       window.location.href = '/chest-open';
+    }
+  };
+
+  const handleEquipPegasus = (pegasusItem) => {
+    if (equippedPegasus === pegasusItem) {
+      // Unequip if clicking the same equipped Pegasus
+      setEquippedPegasus(null);
+      localStorage.removeItem('equippedPegasus');
+      setExpandedPegasus(null);
+    } else {
+      // Equip new Pegasus (automatically unequips previous)
+      setEquippedPegasus(pegasusItem);
+      localStorage.setItem('equippedPegasus', pegasusItem);
+      setExpandedPegasus(pegasusItem);
     }
   };
 
@@ -286,16 +339,83 @@ export default function NFT() {
               
               {/* Owned Section */}
               <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-white font-supercell">Owned</h3>
                   <span className="text-sm text-gray-400">{ownedNFTs.length} nft</span>
                 </div>
-                <div className="collections-grid grid grid-cols-4 gap-3 mb-4">
-                  {ownedNFTs.map((item, index) => {
+                
+                {/* Pegasus Subsection */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-md font-medium text-gray-300 font-supercell ml-2">Pegasus</h4>
+                    <span className="text-xs text-gray-500">{ownedPegasus.length} nft</span>
+                  </div>
+                <div className="collections-grid grid grid-cols-5 gap-4 mb-4">
+                  {ownedPegasus.map((item, index) => {
+                    const rawName = item.replace('.svg', '');
+                    const nameMap = {
+                      'fire pegasus': 'Blaze',
+                      'earth pegasus': 'Granite',
+                      'water pegasus': 'Aqua',
+                      'air pegasus': 'Zephyra',
+                      'rainbow pegasus': 'Prism',
+                    };
+                    const itemName = nameMap[rawName] || rawName.replace(/\b\w/g, l => l.toUpperCase());
+                    const isExpanded = expandedPegasus === item;
+                    const isEquipped = equippedPegasus === item;
+                    const shouldShowButton = isExpanded || isEquipped;
+                    
+                    return (
+                      <div key={`pegasus-${index}`} className="relative" style={{ marginBottom: shouldShowButton ? '48px' : '0' }}>
+                        <div className="pegasus-card-wrapper">
+                          <div 
+                            className="pegasus-card bg-gray-700/50 rounded-lg border border-gray-600/30 p-3 hover:bg-gray-600/50 transition-colors cursor-pointer"
+                            onClick={() => setExpandedPegasus(isExpanded ? null : item)}
+                          >
+                          <div className="aspect-square mb-2">
+                            <img 
+                              src={`/pegasus/${item}`}
+                              alt={itemName}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                          <div className="pegasus-item-name text-gray-300 text-center font-supercell">
+                            {itemName}
+                          </div>
+                          </div>
+                        </div>
+                        {shouldShowButton && (
+                          <button 
+                            className={`equip-button ${isEquipped ? 'equipped' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEquipPegasus(item);
+                            }}
+                          >
+                            {isEquipped ? 'Equipped' : 'Equip'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                </div>
+
+                {/* Body Parts Subsection */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-md font-medium text-gray-300 font-supercell ml-2">Body Parts</h4>
+                    <span className="text-xs text-gray-500">{ownedBodyParts.length} nft</span>
+                  </div>
+                <div className="collections-grid grid [grid-template-columns:repeat(auto-fill,minmax(130px,1fr))] gap-3 mb-4">
+                  {ownedBodyParts.map((item, index) => {
                     const itemName = item.replace('.svg', '').replace(/\b\w/g, l => l.toUpperCase());
                     return (
                       <div 
-                        key={`owned-${index}`}
+                        key={`bodypart-${index}`}
                         className="bg-gray-700/50 rounded-lg border border-gray-600/30 p-3 hover:bg-gray-600/50 transition-colors cursor-pointer"
                       >
                         <div className="aspect-square mb-2">
@@ -315,6 +435,7 @@ export default function NFT() {
                     );
                   })}
                 </div>
+                </div>
               </div>
 
               {/* Unowned Section */}
@@ -323,9 +444,17 @@ export default function NFT() {
                   <h3 className="text-lg font-semibold text-white font-supercell">Unowned</h3>
                   <span className="text-sm text-gray-400">{unownedNFTs.length} nft</span>
                 </div>
-                <div className="collections-grid grid grid-cols-4 gap-3">
+                <div className="collections-grid grid [grid-template-columns:repeat(auto-fill,minmax(130px,1fr))] gap-3">
                   {unownedNFTs.map((item, index) => {
-                    const itemName = item.replace('.svg', '').replace(/\b\w/g, l => l.toUpperCase());
+                    const rawName = item.replace('.svg', '');
+                    const nameMap = {
+                      'fire pegasus': 'Blaze',
+                      'earth pegasus': 'Granite',
+                      'water pegasus': 'Aqua',
+                      'air pegasus': 'Zephyra',
+                      'rainbow pegasus': 'Prism',
+                    };
+                    const itemName = nameMap[rawName] || rawName.replace(/\b\w/g, l => l.toUpperCase());
                     return (
                       <div 
                         key={`unowned-${index}`}
@@ -354,20 +483,37 @@ export default function NFT() {
           </div>
         </div>
 
-        {/* Right Side - Content Area */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="bg-gray-800/90 rounded-2xl border border-gray-600/50 backdrop-blur-md shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-white mb-4 font-supercell">Open a Chest</h2>
-              <p className="text-gray-300 mb-6 font-supercell">
-                Discover rare NFTs from the Pegasus Collection!
-              </p>
-              <button
-                onClick={handleOpenChest}
-                className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-600 hover:from-yellow-500 hover:via-orange-600 hover:to-red-700 text-white font-bold py-4 px-8 rounded-xl text-lg font-supercell transition-all duration-300 transform hover:scale-105 shadow-lg"
-              >
-                5 PGS
-              </button>
+        {/* Right Side - Split Panel */}
+        <div className="flex-1 flex flex-col gap-4">
+          {/* Top 60% - Equipped Pegasus Display */}
+          <div className="h-[60%] flex items-center justify-center">
+            {/* Equipped Pegasus Visual */}
+            <div className="w-full max-w-md flex items-center justify-center mb-2">
+              <div className="w-96 h-96">
+                <img
+                  src={equippedPegasus ? `/pegasus/${equippedPegasus}` : `/pegasus.svg`}
+                  alt="Equipped Pegasus"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom 40% - Chest Opening */}
+          <div className="h-[40%] flex items-center justify-center">
+            <div className="text-center">
+              <div className="bg-gray-800/90 rounded-2xl border border-gray-600/50 backdrop-blur-md shadow-xl p-6">
+                <h2 className="text-xl font-bold text-white mb-3 font-supercell">Open a Chest</h2>
+                <p className="text-gray-300 mb-4 font-supercell text-sm">
+                  Discover rare NFTs from the Pegasus Collection!
+                </p>
+                <button
+                  onClick={handleOpenChest}
+                  className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-600 hover:from-yellow-500 hover:via-orange-600 hover:to-red-700 text-white font-bold py-3 px-6 rounded-xl text-base font-supercell transition-all duration-300 transform hover:scale-105 shadow-lg"
+                >
+                  5 PGS
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -375,6 +521,113 @@ export default function NFT() {
 
       {/* Custom CSS for smooth transitions */}
       <style jsx>{`
+        .pegasus-card-wrapper {
+          transform: scale(1.10);
+          transition: transform 0.3s;
+        }
+
+        .pegasus-card {
+          border-radius: 0.5rem;
+          transition: all 0.3s ease-in-out;
+        }
+
+        .equip-button {
+          position: absolute;
+          left: 50%;
+          transform: translateX(-50%);
+          bottom: -38px;
+          width: 80px;
+          height: 32px;
+          background: linear-gradient(135deg, #FFD700 0%, #FF8C00 50%, #FFA500 100%);
+          color: white;
+          font-family: 'Bangers', 'Supercell-Magic', Arial Black, sans-serif;
+          font-weight: 900;
+          font-size: 11px;
+          text-transform: uppercase;
+          text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+          letter-spacing: 0.5px;
+          border: 3px solid #1E40AF;
+          border-radius: 12px 12px 4px 4px;
+          box-shadow: 
+            0 4px 8px rgba(0,0,0,0.3),
+            0 0 12px rgba(255,215,0,0.4),
+            inset 0 2px 4px rgba(255,255,255,0.3),
+            inset 0 -2px 4px rgba(0,0,0,0.2);
+          cursor: pointer;
+          transition: all 0.15s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+          z-index: 10;
+          overflow: hidden;
+        }
+
+        .equip-button::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+          transition: left 0.5s;
+        }
+
+        .equip-button:hover {
+          transform: translateX(-50%) scale(1.05);
+          box-shadow: 
+            0 8px 16px rgba(0,0,0,0.4),
+            0 0 20px rgba(255,215,0,0.6),
+            inset 0 2px 4px rgba(255,255,255,0.4),
+            inset 0 -2px 4px rgba(0,0,0,0.2);
+          background: linear-gradient(135deg, #FFE55C 0%, #FF9500 50%, #FFB84D 100%);
+        }
+
+        .equip-button:hover::before {
+          left: 100%;
+        }
+
+        .equip-button:active {
+          transform: translateX(-50%) scale(0.95);
+          background: linear-gradient(135deg, #E6C200 0%, #E67E00 50%, #E69500 100%);
+          box-shadow: 
+            0 2px 6px rgba(0,0,0,0.4),
+            inset 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .equip-button.equipped {
+          background: linear-gradient(135deg, #475569 0%, #334155 50%, #1E293B 100%);
+          color: white;
+          border-color: #64748B;
+          box-shadow: 
+            0 2px 4px rgba(0,0,0,0.3),
+            inset 0 1px 2px rgba(255,255,255,0.2),
+            inset 0 -1px 2px rgba(0,0,0,0.3);
+          opacity: 0.9;
+        }
+
+        .equip-button.equipped:hover {
+          background: linear-gradient(135deg, #475569 0%, #334155 50%, #1E293B 100%);
+          transform: translateX(-50%) scale(1.02);
+          box-shadow: 
+            0 3px 6px rgba(0,0,0,0.3),
+            inset 0 1px 2px rgba(255,255,255,0.2),
+            inset 0 -1px 2px rgba(0,0,0,0.3);
+        }
+
+        .equip-button.equipped:active {
+          transform: translateX(-50%) scale(0.98);
+        }
+
+        .pegasus-item-name {
+          white-space: normal;
+          word-wrap: break-word;
+          text-align: center;
+          font-size: 0.65rem;
+          line-height: 1.2;
+        }
+
+        .regular-item-name {
+          font-size: 0.8rem;
+        }
+
         .chest-container {
           transition: all 0.3s ease-in-out;
         }
