@@ -30,6 +30,12 @@ export default function TokenTest() {
   // Dynamic pricing state
   const [pricingInfo, setPricingInfo] = useState(null)
 
+  // 🆕 Enhanced 1inch API data states
+  const [gasInfo, setGasInfo] = useState(null)
+  const [tokenMetadata, setTokenMetadata] = useState(null)
+  const [apiEnhancementInfo, setApiEnhancementInfo] = useState(null)
+  const [oneInchPortfolio, setOneInchPortfolio] = useState(null)
+
   useEffect(() => {
     // Check if wallet was previously connected
     checkExistingConnection()
@@ -70,7 +76,8 @@ export default function TokenTest() {
       await Promise.all([
         loadTokenBalance(),
         loadRealTransactionHistory(),
-        loadPricingInfo()
+        loadPricingInfo(),
+        loadEnhanced1inchData() // 🆕 Load enhanced 1inch API data
       ])
       console.log('✅ All data loaded successfully')
     } catch (error) {
@@ -222,6 +229,24 @@ export default function TokenTest() {
     }
   }
 
+  // 🆕 Load enhanced 1inch API data (portfolio overview)
+  const loadEnhanced1inchData = async () => {
+    if (!userAddress) return
+    
+    try {
+      console.log('🌐 Loading enhanced 1inch portfolio data...')
+      const response = await fetch(`/api/portfolio/enhanced?walletAddress=${userAddress}`)
+      const result = await response.json()
+      
+      if (result.success) {
+        setOneInchPortfolio(result.data)
+        console.log('✅ Enhanced portfolio data loaded:', result.data.summary)
+      }
+    } catch (error) {
+      console.warn('⚠️ Enhanced portfolio data failed:', error.message)
+    }
+  }
+
   const initializeRealContract = async () => {
     // Check if wallet is available
     if (typeof window !== 'undefined' && window.ethereum) {
@@ -331,6 +356,33 @@ export default function TokenTest() {
         const formattedBalance = result.balance
         console.log(`✅ Balance loaded via ${result.source}:`, formattedBalance, 'PGS')
         setTokenBalance(formattedBalance)
+        
+        // 🆕 Extract enhanced data from API response
+        if (result.gasInfo) {
+          // Ensure gas info is properly formatted
+          const normalizedGasInfo = {
+            standard: typeof result.gasInfo.standard === 'object' ? 
+              String(result.gasInfo.standard.maxFeePerGas || result.gasInfo.standard.gasPrice || result.gasInfo.standard) : 
+              String(result.gasInfo.standard || 'N/A'),
+            fast: typeof result.gasInfo.fast === 'object' ? 
+              String(result.gasInfo.fast.maxFeePerGas || result.gasInfo.fast.gasPrice || result.gasInfo.fast) : 
+              String(result.gasInfo.fast || 'N/A'),
+            instant: typeof result.gasInfo.instant === 'object' ? 
+              String(result.gasInfo.instant.maxFeePerGas || result.gasInfo.instant.gasPrice || result.gasInfo.instant) : 
+              String(result.gasInfo.instant || 'N/A')
+          };
+          setGasInfo(normalizedGasInfo);
+          console.log('💰 Gas info received and normalized:', normalizedGasInfo);
+        }
+        if (result.metadata) {
+          setTokenMetadata(result.metadata)
+          console.log('📋 Token metadata received:', result.metadata)
+        }
+        setApiEnhancementInfo({
+          source: result.source,
+          timestamp: result.timestamp,
+          hasEnhancements: !!(result.gasInfo || result.metadata)
+        })
       } else {
         throw new Error(result.error || 'Failed to get balance')
       }
@@ -818,6 +870,172 @@ export default function TokenTest() {
             )}
           </div>
         </div>
+
+        {/* 🆕 Enhanced 1inch API Data Display */}
+        {(gasInfo || tokenMetadata || apiEnhancementInfo || oneInchPortfolio) && (
+          <div className="max-w-6xl mx-auto mt-8">
+            <h2 className="text-2xl font-bold text-center mb-6 text-purple-800">
+              🚀 Enhanced 1inch API Data
+            </h2>
+            
+            <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+              
+              {/* Gas Price Information */}
+              {gasInfo && (
+                <div className="bg-white rounded-lg shadow-xl p-6 border-l-4 border-blue-500">
+                  <h3 className="text-lg font-bold mb-4 text-blue-700">💰 Real-time Gas Prices</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Standard:</span>
+                      <span className="font-mono bg-blue-50 px-2 py-1 rounded text-blue-700">
+                        {typeof gasInfo.standard === 'object' ? 
+                          (gasInfo.standard.maxFeePerGas || gasInfo.standard.gasPrice || 'N/A') : 
+                          gasInfo.standard} gwei
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Fast:</span>
+                      <span className="font-mono bg-green-50 px-2 py-1 rounded text-green-700">
+                        {typeof gasInfo.fast === 'object' ? 
+                          (gasInfo.fast.maxFeePerGas || gasInfo.fast.gasPrice || 'N/A') : 
+                          gasInfo.fast} gwei
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Instant:</span>
+                      <span className="font-mono bg-red-50 px-2 py-1 rounded text-red-700">
+                        {typeof gasInfo.instant === 'object' ? 
+                          (gasInfo.instant.maxFeePerGas || gasInfo.instant.gasPrice || 'N/A') : 
+                          gasInfo.instant} gwei
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">
+                    📡 Powered by 1inch Gas Price API
+                  </p>
+                </div>
+              )}
+
+              {/* Token Metadata */}
+              {tokenMetadata && (
+                <div className="bg-white rounded-lg shadow-xl p-6 border-l-4 border-purple-500">
+                  <h3 className="text-lg font-bold mb-4 text-purple-700">📋 Enhanced Token Info</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-gray-600 text-sm">Token Name:</span>
+                      <p className="font-semibold text-purple-700">{tokenMetadata.name}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 text-sm">Symbol:</span>
+                      <p className="font-semibold text-purple-700">{tokenMetadata.symbol}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 text-sm">Decimals:</span>
+                      <p className="font-mono bg-purple-50 px-2 py-1 rounded text-purple-700 inline-block">
+                        {tokenMetadata.decimals}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">
+                    🪙 Powered by 1inch Token API
+                  </p>
+                </div>
+              )}
+
+              {/* API Enhancement Status */}
+              {apiEnhancementInfo && (
+                <div className="bg-white rounded-lg shadow-xl p-6 border-l-4 border-green-500">
+                  <h3 className="text-lg font-bold mb-4 text-green-700">✨ API Enhancement Status</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-gray-600 text-sm">Data Source:</span>
+                      <p className="font-mono text-sm bg-green-50 px-2 py-1 rounded text-green-700">
+                        {apiEnhancementInfo.source}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 text-sm">Enhancements Active:</span>
+                      <p className="font-semibold">
+                        {apiEnhancementInfo.hasEnhancements ? (
+                          <span className="text-green-600">✅ Yes</span>
+                        ) : (
+                          <span className="text-yellow-600">⚠️ Partial</span>
+                        )}
+                      </p>
+                    </div>
+                    {apiEnhancementInfo.timestamp && (
+                      <div>
+                        <span className="text-gray-600 text-sm">Last Updated:</span>
+                        <p className="text-xs text-gray-500">
+                          {new Date(apiEnhancementInfo.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">
+                    🔧 1inch API Integration Status
+                  </p>
+                </div>
+              )}
+
+              {/* Portfolio Overview */}
+              {oneInchPortfolio && (
+                <div className="bg-white rounded-lg shadow-xl p-6 border-l-4 border-indigo-500 lg:col-span-2 xl:col-span-3">
+                  <h3 className="text-lg font-bold mb-4 text-indigo-700">🌐 Multi-Chain Portfolio Overview</h3>
+                  
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="text-center p-3 bg-indigo-50 rounded-lg">
+                      <p className="text-2xl font-bold text-indigo-700">{oneInchPortfolio.summary.totalChains}</p>
+                      <p className="text-sm text-indigo-600">Total Chains</p>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                      <p className="text-2xl font-bold text-green-700">{oneInchPortfolio.summary.networksWithBalance}</p>
+                      <p className="text-sm text-green-600">Active Networks</p>
+                    </div>
+                    <div className="text-center p-3 bg-purple-50 rounded-lg">
+                      <p className="text-2xl font-bold text-purple-700">{oneInchPortfolio.summary.totalTokens}</p>
+                      <p className="text-sm text-purple-600">Total Tokens</p>
+                    </div>
+                    <div className="text-center p-3 bg-orange-50 rounded-lg">
+                      <p className="text-2xl font-bold text-orange-700">{Object.keys(oneInchPortfolio.gasContext).length}</p>
+                      <p className="text-sm text-orange-600">Gas Data</p>
+                    </div>
+                  </div>
+
+                  {/* Chain Details */}
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-gray-700 mb-3">Chain Details:</h4>
+                    {Object.entries(oneInchPortfolio.chains).map(([chainId, chainData]) => (
+                      <div key={chainId} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <span className="font-medium">{chainData.chainName}</span>
+                          <span className="text-sm text-gray-500 ml-2">({chainId})</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-bold text-indigo-600">{chainData.tokenCount || 0}</span>
+                          <span className="text-sm text-gray-500 ml-1">tokens</span>
+                          {chainData.gasInfo && (
+                            <div className="text-xs text-gray-400">
+                              Gas: {typeof chainData.gasInfo.standard === 'object' ? 
+                                (chainData.gasInfo.standard.maxFeePerGas || chainData.gasInfo.standard.gasPrice || 'N/A') : 
+                                chainData.gasInfo.standard} gwei
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-4">
+                    🔗 Powered by 1inch Balance API + Gas API + Token API
+                  </p>
+                </div>
+              )}
+
+            </div>
+          </div>
+        )}
 
         {/* Status Messages */}
         {error && (

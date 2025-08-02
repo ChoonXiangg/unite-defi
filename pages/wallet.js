@@ -24,6 +24,12 @@ export default function Wallet() {
   const [privateKey, setPrivateKey] = useState('');
   const [keyType, setKeyType] = useState('evm');
 
+  // 🆕 Enhanced 1inch API data states
+  const [enhancedPortfolio, setEnhancedPortfolio] = useState(null);
+  const [gasData, setGasData] = useState(null);
+  const [oneInchNFTs, setOneInchNFTs] = useState(null);
+  const [loadingEnhanced, setLoadingEnhanced] = useState(false);
+
   useEffect(() => {
     loadWallets();
   }, []);
@@ -33,10 +39,13 @@ export default function Wallet() {
     if (activeWallet) {
       // Initial load
       loadPortfolio(activeWallet.walletId, activeWallet.password);
+      // 🆕 Load enhanced 1inch data
+      loadEnhanced1inchData(activeWallet.addresses.evm);
       
       // Set up auto-refresh every 30 seconds
       const interval = setInterval(() => {
         loadPortfolio(activeWallet.walletId, activeWallet.password);
+        loadEnhanced1inchData(activeWallet.addresses.evm);
       }, 30000);
       
       setRefreshInterval(interval);
@@ -223,6 +232,83 @@ export default function Wallet() {
       }
     } catch (error) {
       console.error('Failed to load portfolio:', error);
+    }
+  };
+
+  // 🆕 Load enhanced 1inch API data
+  const loadEnhanced1inchData = async (evmAddress) => {
+    if (!evmAddress) return;
+    
+    setLoadingEnhanced(true);
+    try {
+      console.log('🌐 Loading enhanced 1inch data for wallet...');
+      
+      // Load enhanced portfolio data
+      const portfolioResponse = await fetch(`/api/portfolio/enhanced?walletAddress=${evmAddress}`);
+      if (portfolioResponse.ok) {
+        const portfolioResult = await portfolioResponse.json();
+        if (portfolioResult.success) {
+          setEnhancedPortfolio(portfolioResult.data);
+          console.log('✅ Enhanced portfolio loaded');
+        }
+      }
+
+      // Load gas price data
+      try {
+        const gasResponse = await fetch('https://api.1inch.dev/gas-price/v1.5/42161', {
+          headers: {
+            'Accept': 'application/json',
+            ...(process.env.ONEINCH_API_KEY && { 'Authorization': `Bearer ${process.env.ONEINCH_API_KEY}` })
+          }
+        });
+        if (gasResponse.ok) {
+          const rawGasData = await gasResponse.json();
+          // Normalize gas data format to prevent React rendering errors
+          const normalizedGasData = {
+            standard: typeof rawGasData.standard === 'object' ? 
+              (rawGasData.standard.maxFeePerGas || rawGasData.standard.gasPrice || rawGasData.standard) : 
+              rawGasData.standard,
+            fast: typeof rawGasData.fast === 'object' ? 
+              (rawGasData.fast.maxFeePerGas || rawGasData.fast.gasPrice || rawGasData.fast) : 
+              rawGasData.fast,
+            instant: typeof rawGasData.instant === 'object' ? 
+              (rawGasData.instant.maxFeePerGas || rawGasData.instant.gasPrice || rawGasData.instant) : 
+              rawGasData.instant
+          };
+          setGasData(normalizedGasData);
+          console.log('✅ Gas data loaded and normalized');
+        }
+      } catch (gasError) {
+        console.warn('⚠️ Gas data loading failed:', gasError.message);
+      }
+
+      // Load NFT data via our enhanced endpoint
+      if (activeWallet) {
+        try {
+          const nftResponse = await fetch('/api/nft/user-nfts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              walletId: activeWallet.walletId,
+              password: activeWallet.password
+            })
+          });
+          if (nftResponse.ok) {
+            const nftResult = await nftResponse.json();
+            if (nftResult.success && nftResult.enhanced) {
+              setOneInchNFTs(nftResult.enhanced);
+              console.log('✅ Enhanced NFT data loaded');
+            }
+          }
+        } catch (nftError) {
+          console.warn('⚠️ NFT data loading failed:', nftError.message);
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ Enhanced data loading failed:', error);
+    } finally {
+      setLoadingEnhanced(false);
     }
   };
 
@@ -676,6 +762,276 @@ export default function Wallet() {
               {data.error && <p style={{ color: 'red' }}>Error: {data.error}</p>}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 🆕 Enhanced 1inch API Data Display */}
+      {activeWallet && (enhancedPortfolio || gasData || oneInchNFTs) && (
+        <div style={{ marginBottom: '30px' }}>
+          <h2>🚀 Enhanced Portfolio Data (Powered by 1inch APIs)</h2>
+          
+          {loadingEnhanced && (
+            <div style={{ padding: '10px', backgroundColor: '#e3f2fd', borderRadius: '5px', marginBottom: '20px' }}>
+              <p>🔄 Loading enhanced data from 1inch APIs...</p>
+            </div>
+          )}
+
+          {/* Gas Price Information */}
+          {gasData && (
+            <div style={{ 
+              marginBottom: '20px', 
+              padding: '15px', 
+              border: '1px solid #e0e0e0', 
+              borderRadius: '8px',
+              backgroundColor: '#f8f9fa'
+            }}>
+              <h3 style={{ color: '#1976d2', marginBottom: '15px' }}>💰 Real-time Gas Prices (Arbitrum One)</h3>
+              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                <div style={{ 
+                  padding: '10px 15px', 
+                  backgroundColor: '#e3f2fd', 
+                  borderRadius: '5px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontWeight: 'bold', color: '#1976d2' }}>Standard</div>
+                  <div style={{ fontSize: '18px', fontFamily: 'monospace' }}>
+                    {typeof gasData.standard === 'object' ? 
+                      (gasData.standard.maxFeePerGas || gasData.standard.gasPrice || 'N/A') : 
+                      gasData.standard} gwei
+                  </div>
+                </div>
+                <div style={{ 
+                  padding: '10px 15px', 
+                  backgroundColor: '#e8f5e8', 
+                  borderRadius: '5px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontWeight: 'bold', color: '#388e3c' }}>Fast</div>
+                  <div style={{ fontSize: '18px', fontFamily: 'monospace' }}>
+                    {typeof gasData.fast === 'object' ? 
+                      (gasData.fast.maxFeePerGas || gasData.fast.gasPrice || 'N/A') : 
+                      gasData.fast} gwei
+                  </div>
+                </div>
+                <div style={{ 
+                  padding: '10px 15px', 
+                  backgroundColor: '#ffebee', 
+                  borderRadius: '5px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontWeight: 'bold', color: '#d32f2f' }}>Instant</div>
+                  <div style={{ fontSize: '18px', fontFamily: 'monospace' }}>
+                    {typeof gasData.instant === 'object' ? 
+                      (gasData.instant.maxFeePerGas || gasData.instant.gasPrice || 'N/A') : 
+                      gasData.instant} gwei
+                  </div>
+                </div>
+              </div>
+              <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
+                📡 Powered by 1inch Gas Price API
+              </p>
+            </div>
+          )}
+
+          {/* Multi-Chain Portfolio Overview */}
+          {enhancedPortfolio && (
+            <div style={{ 
+              marginBottom: '20px', 
+              padding: '15px', 
+              border: '1px solid #e0e0e0', 
+              borderRadius: '8px',
+              backgroundColor: '#f8f9fa'
+            }}>
+              <h3 style={{ color: '#7b1fa2', marginBottom: '15px' }}>🌐 Multi-Chain Portfolio Overview</h3>
+              
+              {/* Summary Statistics */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
+                gap: '15px', 
+                marginBottom: '20px' 
+              }}>
+                <div style={{ 
+                  padding: '15px', 
+                  backgroundColor: '#e1bee7', 
+                  borderRadius: '8px', 
+                  textAlign: 'center' 
+                }}>
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#7b1fa2' }}>
+                    {enhancedPortfolio.summary.totalChains}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#6a1b9a' }}>Total Chains</div>
+                </div>
+                <div style={{ 
+                  padding: '15px', 
+                  backgroundColor: '#c8e6c9', 
+                  borderRadius: '8px', 
+                  textAlign: 'center' 
+                }}>
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#388e3c' }}>
+                    {enhancedPortfolio.summary.networksWithBalance}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#2e7d32' }}>Active Networks</div>
+                </div>
+                <div style={{ 
+                  padding: '15px', 
+                  backgroundColor: '#bbdefb', 
+                  borderRadius: '8px', 
+                  textAlign: 'center' 
+                }}>
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1976d2' }}>
+                    {enhancedPortfolio.summary.totalTokens}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#1565c0' }}>Total Tokens</div>
+                </div>
+                <div style={{ 
+                  padding: '15px', 
+                  backgroundColor: '#ffe0b2', 
+                  borderRadius: '8px', 
+                  textAlign: 'center' 
+                }}>
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f57c00' }}>
+                    {Object.keys(enhancedPortfolio.gasContext).length}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#ef6c00' }}>Gas Data</div>
+                </div>
+              </div>
+
+              {/* Chain Details */}
+              <div>
+                <h4 style={{ marginBottom: '10px', color: '#666' }}>Chain Details:</h4>
+                {Object.entries(enhancedPortfolio.chains).map(([chainId, chainData]) => (
+                  <div key={chainId} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: '10px 15px', 
+                    backgroundColor: '#ffffff', 
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '5px',
+                    marginBottom: '8px'
+                  }}>
+                    <div>
+                      <span style={{ fontWeight: 'bold' }}>{chainData.chainName}</span>
+                      <span style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>({chainId})</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div>
+                        <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#7b1fa2' }}>
+                          {chainData.tokenCount || 0}
+                        </span>
+                        <span style={{ fontSize: '12px', color: '#666', marginLeft: '4px' }}>tokens</span>
+                      </div>
+                      {chainData.gasInfo && (
+                        <div style={{ fontSize: '10px', color: '#999' }}>
+                          Gas: {typeof chainData.gasInfo.standard === 'object' ? 
+                            (chainData.gasInfo.standard.maxFeePerGas || chainData.gasInfo.standard.gasPrice || 'N/A') : 
+                            chainData.gasInfo.standard} gwei
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p style={{ fontSize: '12px', color: '#666', marginTop: '15px' }}>
+                🔗 Powered by 1inch Balance API + Gas API + Token API
+              </p>
+            </div>
+          )}
+
+          {/* Enhanced NFT Discovery */}
+          {oneInchNFTs && (
+            <div style={{ 
+              marginBottom: '20px', 
+              padding: '15px', 
+              border: '1px solid #e0e0e0', 
+              borderRadius: '8px',
+              backgroundColor: '#f8f9fa'
+            }}>
+              <h3 style={{ color: '#e91e63', marginBottom: '15px' }}>🖼️ Enhanced NFT Discovery</h3>
+              
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                gap: '15px', 
+                marginBottom: '15px' 
+              }}>
+                <div style={{ 
+                  padding: '15px', 
+                  backgroundColor: '#fce4ec', 
+                  borderRadius: '8px', 
+                  textAlign: 'center' 
+                }}>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#c2185b' }}>
+                    {oneInchNFTs.oneInchCount}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#ad1457' }}>1inch Discovered</div>
+                </div>
+                <div style={{ 
+                  padding: '15px', 
+                  backgroundColor: '#e8eaf6', 
+                  borderRadius: '8px', 
+                  textAlign: 'center' 
+                }}>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#3f51b5' }}>
+                    {oneInchNFTs.totalNFTs}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#303f9f' }}>Total NFTs</div>
+                </div>
+              </div>
+
+              {oneInchNFTs.oneInchNFTs && oneInchNFTs.oneInchNFTs.length > 0 && (
+                <div>
+                  <h4 style={{ marginBottom: '10px', color: '#666' }}>NFTs discovered by 1inch:</h4>
+                  {oneInchNFTs.oneInchNFTs.slice(0, 3).map((nft, index) => (
+                    <div key={index} style={{ 
+                      padding: '10px 15px', 
+                      backgroundColor: '#ffffff', 
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '5px',
+                      marginBottom: '8px'
+                    }}>
+                      <div style={{ fontWeight: 'bold' }}>{nft.name}</div>
+                      {nft.collectionName && (
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                          Collection: {nft.collectionName}
+                        </div>
+                      )}
+                      <div style={{ fontSize: '11px', color: '#999' }}>
+                        {nft.contractAddress} • Token #{nft.tokenId}
+                      </div>
+                      {nft.marketplace && (
+                        <div style={{ fontSize: '10px', color: '#999' }}>
+                          Marketplace: {nft.marketplace}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {oneInchNFTs.oneInchNFTs.length > 3 && (
+                    <p style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                      ... and {oneInchNFTs.oneInchNFTs.length - 3} more NFTs
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <p style={{ fontSize: '12px', color: '#666', marginTop: '15px' }}>
+                🎨 Powered by 1inch NFT API
+              </p>
+            </div>
+          )}
+
+          <div style={{ 
+            padding: '10px 15px', 
+            backgroundColor: '#e8f5e8', 
+            borderRadius: '5px',
+            textAlign: 'center'
+          }}>
+            <p style={{ margin: 0, fontSize: '12px', color: '#2e7d32' }}>
+              ✨ Enhanced data automatically refreshes every 30 seconds
+            </p>
+          </div>
         </div>
       )}
 

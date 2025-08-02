@@ -62,72 +62,24 @@ export default async function handler(req, res) {
 
     const tokenResults = {};
 
-    // Common ERC20 token addresses for major networks
-    const commonTokens = {
-      ethereum: [
-        { address: '0xA0b86a33E6E8B17B0B8B1c8e7F7b8C8B8f6a8F1D', symbol: 'USDC', name: 'USD Coin', decimals: 6 },
-        { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', symbol: 'USDT', name: 'Tether USD', decimals: 6 },
-        { address: '0x6B175474E89094C44Da98b954EedeAC495271d0F', symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18 },
-      ],
-      bsc: [
-        { address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', symbol: 'USDC', name: 'USD Coin', decimals: 18 },
-        { address: '0x55d398326f99059fF775485246999027B3197955', symbol: 'USDT', name: 'Tether USD', decimals: 18 },
-        { address: '0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3', symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18 },
-      ],
-      polygon: [
-        { address: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174', symbol: 'USDC', name: 'USD Coin', decimals: 6 },
-        { address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', symbol: 'USDT', name: 'Tether USD', decimals: 6 },
-        { address: '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063', symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18 },
-      ],
-      arbitrumSepolia: [
-        // Add your deployed PGS token (testnet)
-        { address: '0x032CdA4d263385dDe296C6C288B56A750CcCF047', symbol: 'PGS', name: 'PGS Token', decimals: 18 },
-      ],
-      arbitrumOne: [
-        // Add your mainnet PGS token
-        { address: '0x4a109A21EeD37d5D1AA0e8e2DE9e50005850eC6c', symbol: 'PGS', name: 'PGS Token', decimals: 18 },
-      ]
-    };
+    // 🚀 Now 100% powered by 1inch APIs - no hardcoded token lists needed!
+    // 1inch API will discover ALL tokens automatically
 
-    // ERC20 ABI for balance and token info queries
-    const erc20ABI = [
-      'function balanceOf(address owner) view returns (uint256)',
-      'function decimals() view returns (uint8)',
-      'function symbol() view returns (string)',
-      'function name() view returns (string)'
-    ];
-
-    // Process each network
+    // 🚀 Process each network using 100% 1inch APIs
     for (const [networkKey, networkConfig] of Object.entries(networks)) {
       console.log(`🌐 Checking ${networkConfig.name} for tokens...`);
       
       try {
-        // Create provider with fallback
-        let provider = null;
-        for (const rpcUrl of networkConfig.rpcUrls) {
-          try {
-            provider = new ethers.JsonRpcProvider(rpcUrl);
-            await provider.getBlockNumber(); // Test connection
-            break;
-          } catch (rpcError) {
-            console.warn(`RPC failed for ${networkConfig.name}:`, rpcUrl);
-            continue;
-          }
-        }
-
-        if (!provider) {
-          tokenResults[networkKey] = {
-            network: networkConfig.name,
-            error: 'All RPC endpoints failed',
-            tokens: []
-          };
-          continue;
-        }
-
         const networkTokens = [];
+        const apiKey = process.env.ONEINCH_API_KEY;
+        const headers = { 'Accept': 'application/json' };
+        if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-        // Get native token balance
+        // 🆕 Step 1: Get native token balance using 1inch-style approach
         try {
+          // For native tokens, we can still use a simple RPC call but format it like 1inch
+          const { ethers } = require('ethers');
+          const provider = new ethers.JsonRpcProvider(networkConfig.rpcUrls[0]);
           const nativeBalance = await provider.getBalance(walletAddress);
           const formattedNativeBalance = ethers.formatEther(nativeBalance);
           
@@ -138,135 +90,103 @@ export default async function handler(req, res) {
               name: `${networkConfig.name} Native Token`,
               balance: formattedNativeBalance,
               decimals: 18,
-              address: 'native'
+              address: 'native',
+              source: 'rpc_native'
             });
           }
         } catch (nativeError) {
           console.warn(`Failed to get native balance for ${networkConfig.name}:`, nativeError.message);
         }
 
-            // 🆕 Use 1inch Balance API first, then fallback to RPC
-        let oneInchTokens = [];
+        // 🆕 Step 2: Use 1inch Balance API to discover ALL ERC20 tokens
         try {
-          const apiKey = process.env.ONEINCH_API_KEY;
           const oneInchUrl = `https://api.1inch.dev/balance/v1.2/${networkConfig.chainId}/balances/${walletAddress}`;
-          
-          const headers = { 'Accept': 'application/json' };
-          if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
-          
           const oneInchResponse = await fetch(oneInchUrl, { headers });
+          
           if (oneInchResponse.ok) {
             const oneInchData = await oneInchResponse.json();
             console.log(`✅ 1inch Balance API found ${Object.keys(oneInchData).length} tokens on ${networkConfig.name}`);
             
-            // Convert 1inch response to our format
-            for (const [tokenAddress, balance] of Object.entries(oneInchData)) {
-              if (balance && balance !== '0') {
-                // 🆕 Use 1inch Token API to get token metadata
+            // 🆕 Step 3: For each token with balance, get comprehensive metadata
+            const tokenAddresses = Object.keys(oneInchData).filter(addr => oneInchData[addr] !== '0');
+            
+            if (tokenAddresses.length > 0) {
+              // Batch process tokens in chunks of 20 to avoid API limits
+              const chunks = [];
+              for (let i = 0; i < tokenAddresses.length; i += 20) {
+                chunks.push(tokenAddresses.slice(i, i + 20));
+              }
+              
+              for (const chunk of chunks) {
                 try {
-                  const tokenApiUrl = `https://api.1inch.dev/token/v1.2/${networkConfig.chainId}/custom?addresses=${tokenAddress}`;
+                  // 🆕 Step 3a: Get token metadata for chunk using 1inch Token API
+                  const tokenApiUrl = `https://api.1inch.dev/token/v1.2/${networkConfig.chainId}/custom?addresses=${chunk.join(',')}`;
                   const tokenResponse = await fetch(tokenApiUrl, { headers });
                   
                   if (tokenResponse.ok) {
                     const tokenData = await tokenResponse.json();
-                    const token = tokenData[tokenAddress.toLowerCase()];
                     
-                    if (token) {
-                      const formattedBalance = ethers.formatUnits(balance, token.decimals || 18);
-                      
-                      // 🆕 Get USD value using 1inch Spot Price API (except for PGS token)
-                      let usdValue = null;
-                      const isPGSToken = token.symbol === 'PGS' || token.name?.includes('PGS');
-                      
-                      if (!isPGSToken) {
-                        try {
-                          const priceUrl = `https://api.1inch.dev/price/v1.1/${networkConfig.chainId}/${tokenAddress}`;
-                          const priceResponse = await fetch(priceUrl, { headers });
-                          
-                          if (priceResponse.ok) {
-                            const priceData = await priceResponse.json();
-                            const tokenPrice = priceData[tokenAddress.toLowerCase()];
-                            if (tokenPrice) {
-                              usdValue = (parseFloat(formattedBalance) * parseFloat(tokenPrice)).toFixed(2);
-                            }
-                          }
-                        } catch (priceError) {
-                          console.warn(`Price API failed for ${tokenAddress}:`, priceError.message);
+                    // 🆕 Step 3b: Get price data for non-PGS tokens using 1inch Spot Price API
+                    let priceData = {};
+                    const nonPgsTokens = chunk.filter(addr => {
+                      const token = tokenData[addr.toLowerCase()];
+                      return token && !(token.symbol === 'PGS' || token.name?.includes('PGS'));
+                    });
+                    
+                    if (nonPgsTokens.length > 0) {
+                      try {
+                        const priceUrl = `https://api.1inch.dev/price/v1.1/${networkConfig.chainId}/${nonPgsTokens.join(',')}`;
+                        const priceResponse = await fetch(priceUrl, { headers });
+                        if (priceResponse.ok) {
+                          priceData = await priceResponse.json();
                         }
+                      } catch (priceError) {
+                        console.warn(`Price API failed for chunk:`, priceError.message);
                       }
+                    }
+                    
+                    // 🆕 Step 3c: Process each token with full 1inch data
+                    for (const tokenAddress of chunk) {
+                      const balance = oneInchData[tokenAddress];
+                      const token = tokenData[tokenAddress.toLowerCase()];
                       
-                      oneInchTokens.push({
-                        type: isPGSToken ? 'reward' : 'erc20',
-                        address: tokenAddress,
-                        symbol: token.symbol || 'UNKNOWN',
-                        name: token.name || 'Unknown Token',
-                        balance: formattedBalance,
-                        usdValue: usdValue,
-                        decimals: token.decimals || 18,
-                        contractAddress: tokenAddress,
-                        source: '1inch_api',
-                        ...(isPGSToken && { note: 'Reward token - no market value' })
-                      });
+                      if (token && balance !== '0') {
+                        const formattedBalance = ethers.formatUnits(balance, token.decimals || 18);
+                        const isPGSToken = token.symbol === 'PGS' || token.name?.includes('PGS');
+                        
+                        // Calculate USD value
+                        let usdValue = null;
+                        if (!isPGSToken && priceData[tokenAddress.toLowerCase()]) {
+                          const tokenPrice = priceData[tokenAddress.toLowerCase()];
+                          usdValue = (parseFloat(formattedBalance) * parseFloat(tokenPrice)).toFixed(2);
+                        }
+                        
+                        networkTokens.push({
+                          type: isPGSToken ? 'reward' : 'erc20',
+                          address: tokenAddress,
+                          symbol: token.symbol || 'UNKNOWN',
+                          name: token.name || 'Unknown Token',
+                          balance: formattedBalance,
+                          usdValue: usdValue,
+                          decimals: token.decimals || 18,
+                          contractAddress: tokenAddress,
+                          source: '1inch_comprehensive',
+                          logoURI: token.logoURI,
+                          ...(isPGSToken && { note: 'Reward token - price not available' })
+                        });
+                      }
                     }
                   }
-                } catch (tokenApiError) {
-                  console.warn(`Token API failed for ${tokenAddress}:`, tokenApiError.message);
+                } catch (chunkError) {
+                  console.warn(`Failed to process token chunk on ${networkConfig.name}:`, chunkError.message);
                 }
               }
             }
+          } else {
+            console.warn(`1inch Balance API failed for ${networkConfig.name}: ${oneInchResponse.status}`);
           }
         } catch (oneInchError) {
-          console.warn(`1inch Balance API failed for ${networkConfig.name}:`, oneInchError.message);
-        }
-
-        // Add 1inch tokens to results
-        networkTokens.push(...oneInchTokens);
-
-        // Get ERC20 token balances (fallback for tokens not found by 1inch)
-        const tokensToCheck = commonTokens[networkKey] || [];
-        
-        for (const tokenInfo of tokensToCheck) {
-          // Skip if already found by 1inch API
-          if (oneInchTokens.some(t => t.address.toLowerCase() === tokenInfo.address.toLowerCase())) {
-            continue;
-          }
-          
-          try {
-            const tokenContract = new ethers.Contract(tokenInfo.address, erc20ABI, provider);
-            
-            // Get token balance
-            const balance = await tokenContract.balanceOf(walletAddress);
-            const decimals = tokenInfo.decimals || await tokenContract.decimals();
-            const formattedBalance = ethers.formatUnits(balance, decimals);
-            
-            // Only include tokens with non-zero balance
-            if (parseFloat(formattedBalance) > 0) {
-              let tokenName = tokenInfo.name;
-              let tokenSymbol = tokenInfo.symbol;
-              
-              // Try to get live token info if not provided
-              if (!tokenName || !tokenSymbol) {
-                try {
-                  tokenName = tokenName || await tokenContract.name();
-                  tokenSymbol = tokenSymbol || await tokenContract.symbol();
-                } catch (infoError) {
-                  console.warn(`Failed to get token info for ${tokenInfo.address}:`, infoError.message);
-                }
-              }
-              
-              networkTokens.push({
-                type: 'erc20',
-                address: tokenInfo.address,
-                symbol: tokenSymbol || 'UNKNOWN',
-                name: tokenName || 'Unknown Token',
-                balance: formattedBalance,
-                decimals: decimals,
-                contractAddress: tokenInfo.address
-              });
-            }
-          } catch (tokenError) {
-            console.warn(`Failed to check token ${tokenInfo.address} on ${networkConfig.name}:`, tokenError.message);
-          }
+          console.warn(`1inch API completely failed for ${networkConfig.name}:`, oneInchError.message);
         }
 
         tokenResults[networkKey] = {
