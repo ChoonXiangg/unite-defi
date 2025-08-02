@@ -165,34 +165,53 @@ const OrderbookPage = () => {
     }
   };
 
-  // Analyze profitability of an order with fallback for sync usage
+  // Analyze profitability of an order with proper amount handling
   const analyzeProfitability = (order) => {
     try {
-      // Ensure amounts are strings or BigInt, not Promises
-      const fromAmountStr = typeof order.fromAmount === 'string' ? order.fromAmount : order.fromAmount.toString();
-      const toAmountStr = typeof order.toAmount === 'string' ? order.toAmount : order.toAmount.toString();
+      // Helper function to safely convert amounts
+      const safeParseAmount = (amount) => {
+        if (!amount || amount === null || amount === undefined) {
+          return 0;
+        }
+        
+        const amountStr = amount.toString();
+        
+        // If it's a very large number (wei), convert to ether
+        if (!amountStr.includes('.') && amountStr.length >= 12) {
+          try {
+            return parseFloat(ethers.formatEther(amountStr));
+          } catch (error) {
+            console.error('Error parsing wei amount in profitability:', amountStr, error);
+            return parseFloat(amountStr);
+          }
+        }
+        
+        // If it's already a decimal or small number
+        return parseFloat(amountStr);
+      };
       
-      const fromAmount = parseFloat(ethers.formatEther(fromAmountStr));
-      const toAmount = parseFloat(ethers.formatEther(toAmountStr));
+      const fromAmount = safeParseAmount(order.fromAmount);
+      const toAmount = safeParseAmount(order.toAmount);
       
-      // Use a simple fallback rate for immediate display
-      // Real-time rates will be fetched in background for order execution
-      let currentPrice = 1.0;
+      // Simple profitability check based on order ratio
+      const orderRate = fromAmount > 0 ? toAmount / fromAmount : 0;
+      
+      // Expected rates (approximate)
+      let expectedRate = 1.0;
       if (order.fromChain === 'ethereum' && order.toChain === 'etherlink') {
-        currentPrice = 4700; // Approximate ETH to XTZ rate
+        expectedRate = 4700; // ETH to XTZ
       } else if (order.fromChain === 'etherlink' && order.toChain === 'ethereum') {
-        currentPrice = 0.000212; // Approximate XTZ to ETH rate
+        expectedRate = 0.000212; // XTZ to ETH
       }
       
-      const expectedValue = fromAmount * currentPrice;
-      const profit = toAmount - expectedValue;
-      const profitPercentage = expectedValue > 0 ? (profit / expectedValue) * 100 : 0;
+      const profit = (orderRate - expectedRate) * fromAmount;
+      const profitPercentage = expectedRate > 0 ? ((orderRate - expectedRate) / expectedRate) * 100 : 0;
       
       return {
         profitable: profit > 0,
-        profit: profit,
+        profit: Math.abs(profit),
         profitPercentage: profitPercentage,
-        currentPrice: currentPrice,
+        currentPrice: expectedRate,
         priceSource: 'Estimated'
       };
     } catch (error) {
@@ -202,7 +221,7 @@ const OrderbookPage = () => {
         profit: 0,
         profitPercentage: 0,
         currentPrice: 1.0,
-        priceSource: 'Fallback'
+        priceSource: 'Error'
       };
     }
   };
@@ -397,21 +416,30 @@ const OrderbookPage = () => {
                   const fromTokenSymbol = getTokenSymbol(order.fromToken, order.fromChain);
                   const toTokenSymbol = getTokenSymbol(order.toToken, order.toChain);
                   
-                  // Safe formatting with null checks
-                  let fromAmount = '0';
-                  let toAmount = '0';
-                  try {
-                    if (order.fromAmount && order.fromAmount !== null) {
-                      fromAmount = ethers.formatEther(order.fromAmount.toString());
+                  // Safe formatting with improved wei detection
+                  const safeFormatAmount = (amount) => {
+                    if (!amount || amount === null || amount === undefined) {
+                      return '0';
                     }
-                    if (order.toAmount && order.toAmount !== null) {
-                      toAmount = ethers.formatEther(order.toAmount.toString());
+                    
+                    const amountStr = amount.toString();
+                    
+                    // If it's a very large number (likely wei), format from wei to ether
+                    if (!amountStr.includes('.') && amountStr.length >= 12) {
+                      try {
+                        return parseFloat(ethers.formatEther(amountStr)).toFixed(6);
+                      } catch (error) {
+                        console.error('Error formatting wei amount:', amountStr, error);
+                        return parseFloat(amountStr).toFixed(6);
+                      }
                     }
-                  } catch (error) {
-                    console.error('Error formatting amounts:', error);
-                    fromAmount = order.fromAmount?.toString() || '0';
-                    toAmount = order.toAmount?.toString() || '0';
-                  }
+                    
+                    // If it's already a decimal or small number, return as is
+                    return parseFloat(amountStr).toFixed(6);
+                  };
+                  
+                  const fromAmount = safeFormatAmount(order.fromAmount);
+                  const toAmount = safeFormatAmount(order.toAmount);
                   
                   return (
                     <tr key={order.id} className="hover:bg-gray-50">

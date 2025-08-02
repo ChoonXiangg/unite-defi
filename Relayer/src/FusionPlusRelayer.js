@@ -18,106 +18,110 @@ class FusionPlusRelayer {
         this.CANCELLATION_PERIOD = 600000; // 10 minutes
         this.SAFETY_DEPOSIT_AMOUNT = ethers.parseEther('0.01'); // 0.01 ETH
         
-        // Initialize providers and contracts
-        this.setupProviders();
-        this.setupContracts();
+        // Dynamic provider and contract storage
+        this.providers = new Map();
+        this.contracts = new Map();
+        this.signers = new Map();
         
-        console.log('✅ 1inch Fusion+ Relayer initialized');
+        // Network configurations
+        this.networkConfigs = {
+            'etherlink': {
+                rpc: 'https://node.ghostnet.etherlink.com',
+                escrowFactory: '0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff',
+                lop: '0xf4C21603E2A717aC176880Bf7EB00E560A4459ab',
+                chainId: 128123
+            },
+            'ethereum': {
+                rpc: this.config.SEPOLIA_RPC_URL,
+                escrowFactory: '0xd76e13de08cfF2d3463Ce8c1a78a2A86E631E312',
+                lop: '0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff',
+                chainId: 11155111
+            }
+        };
+        
+        console.log('✅ 1inch Fusion+ Relayer initialized (dynamic mode)');
     }
 
-    setupProviders() {
-        try {
-            // Etherlink Ghostnet Provider (Source Chain)
-            this.etherlinkProvider = new ethers.JsonRpcProvider(
-                'https://node.ghostnet.etherlink.com'
-            );
-            
-            // Ethereum Sepolia Provider (Destination Chain)
-            this.sepoliaProvider = new ethers.JsonRpcProvider(
-                this.config.SEPOLIA_RPC_URL
-            );
-
-            console.log('✅ Blockchain providers connected');
-            
-            // Setup wallet if private key provided
-            if (this.config.PRIVATE_KEY) {
-                this.wallet = new ethers.Wallet(this.config.PRIVATE_KEY);
-                this.etherlinkSigner = this.wallet.connect(this.etherlinkProvider);
-                this.sepoliaSigner = this.wallet.connect(this.sepoliaProvider);
-                console.log('✅ Wallet configured for resolver operations');
-            } else {
-                console.log('⚠️  No private key - running in read-only mode');
+    // Dynamic provider setup - only when needed
+    async getProvider(chainName) {
+        if (!this.providers.has(chainName)) {
+            const config = this.networkConfigs[chainName];
+            if (!config) {
+                throw new Error(`Unsupported chain: ${chainName}`);
             }
             
-        } catch (error) {
-            console.error('❌ Provider setup failed:', error.message);
-            throw error;
+            console.log(`🔗 Connecting to ${chainName} network...`);
+            const provider = new ethers.JsonRpcProvider(config.rpc);
+            this.providers.set(chainName, provider);
+            
+            // Setup signer if private key available
+            if (this.config.PRIVATE_KEY) {
+                const wallet = new ethers.Wallet(this.config.PRIVATE_KEY);
+                const signer = wallet.connect(provider);
+                this.signers.set(chainName, signer);
+                console.log(`✅ ${chainName} provider and signer ready`);
+            } else {
+                console.log(`✅ ${chainName} provider ready (read-only mode)`);
+            }
         }
+        
+        return this.providers.get(chainName);
     }
 
-    setupContracts() {
-        // Complete EscrowFactory ABI based on your deployed contracts
-        const escrowFactoryABI = [
-            "function createSrcEscrow((bytes32,bytes32,uint256,uint256,uint256,uint256,uint256,uint256)) external payable",
-            "function createDstEscrow((bytes32,bytes32,uint256,uint256,uint256,uint256,uint256,uint256),uint256) external payable",
-            "function addressOfEscrowSrc((bytes32,bytes32,uint256,uint256,uint256,uint256,uint256,uint256)) external view returns (address)",
-            "function addressOfEscrowDst((bytes32,bytes32,uint256,uint256,uint256,uint256,uint256,uint256)) external view returns (address)",
-            "function withdraw(address,bytes32) external",
-            "function cancel(address) external",
-            "function owner() external view returns (address)",
-            "function feeToken() external view returns (address)",
-            "function limitOrderProtocol() external view returns (address)",
-            "event SrcEscrowCreated((bytes32,bytes32,uint256,uint256,uint256,uint256,uint256,uint256),(uint256,uint256,uint256,uint256,uint256))",
-            "event DstEscrowCreated(address,bytes32,uint256)",
-            "event WithdrawalCompleted(address,bytes32,uint256)",
-            "event EscrowCancelled(address,uint256)"
-        ];
-
-        // LimitOrderProtocol ABI for your deployed LOP contracts
-        const lopABI = [
-            "function fillOrder(address maker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount, string fromChain, string toChain, uint256 nonce, uint256 deadline, bytes signature) external",
-            "function executeOrder(address maker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount, string fromChain, string toChain, uint256 nonce, uint256 deadline, bytes signature) external",
-            "function validateOrder(address maker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount, string fromChain, string toChain, uint256 nonce, uint256 deadline, bytes signature) external view returns (bool)",
-            "function cancelOrder(uint256 nonce) external",
-            "function isOrderCancelled(address maker, uint256 nonce) external view returns (bool)",
-            "event OrderFilled(address indexed maker, address indexed taker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount)",
-            "event OrderCancelled(address indexed maker, uint256 nonce)"
-        ];
-
-        try {
-            // EscrowFactory contracts
-            this.etherlinkFactory = new ethers.Contract(
-                process.env.ETHERLINK_ESCROW_FACTORY_ADDRESS || '0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff',
-                escrowFactoryABI,
-                this.etherlinkSigner || this.etherlinkProvider
-            );
-
-            this.sepoliaFactory = new ethers.Contract(
-                process.env.SEPOLIA_ESCROW_FACTORY_ADDRESS || '0xd76e13de08cfF2d3463Ce8c1a78a2A86E631E312',
-                escrowFactoryABI,
-                this.sepoliaSigner || this.sepoliaProvider
-            );
-
-            // LimitOrderProtocol contracts
-            this.etherlinkLOP = new ethers.Contract(
-                process.env.ETHERLINK_HYBRID_LOP_ADDRESS || '0xf4C21603E2A717aC176880Bf7EB00E560A4459ab',
-                lopABI,
-                this.etherlinkSigner || this.etherlinkProvider
-            );
-
-            this.sepoliaLOP = new ethers.Contract(
-                process.env.SEPOLIA_HYBRID_LOP_ADDRESS || '0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff',
-                lopABI,
-                this.sepoliaSigner || this.sepoliaProvider
-            );
-
-            console.log('✅ 1inch Fusion+ contract interfaces loaded');
-            console.log('📍 Etherlink LOP:', process.env.ETHERLINK_HYBRID_LOP_ADDRESS || '0xf4C21603E2A717aC176880Bf7EB00E560A4459ab');
-            console.log('📍 Sepolia LOP:', process.env.SEPOLIA_HYBRID_LOP_ADDRESS || '0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff');
-        } catch (error) {
-            console.error('❌ Contract setup failed:', error.message);
-            throw error;
+    // Dynamic contract loading - only when needed
+    async getContract(chainName, contractType) {
+        const contractKey = `${chainName}_${contractType}`;
+        
+        if (!this.contracts.has(contractKey)) {
+            const config = this.networkConfigs[chainName];
+            if (!config) {
+                throw new Error(`Unsupported chain: ${chainName}`);
+            }
+            
+            const provider = await this.getProvider(chainName);
+            const signer = this.signers.get(chainName);
+            
+            let contractAddress, abi;
+            
+            if (contractType === 'escrowFactory') {
+                contractAddress = config.escrowFactory;
+                abi = [
+                    "function createSrcEscrow((bytes32,bytes32,uint256,uint256,uint256,uint256,uint256,uint256)) external payable",
+                    "function createDstEscrow((bytes32,bytes32,uint256,uint256,uint256,uint256,uint256,uint256),uint256) external payable",
+                    "function addressOfEscrowSrc((bytes32,bytes32,uint256,uint256,uint256,uint256,uint256,uint256)) external view returns (address)",
+                    "function addressOfEscrowDst((bytes32,bytes32,uint256,uint256,uint256,uint256,uint256,uint256)) external view returns (address)",
+                    "function withdraw(address,bytes32) external",
+                    "function cancel(address) external",
+                    "function owner() external view returns (address)",
+                    "function feeToken() external view returns (address)",
+                    "function limitOrderProtocol() external view returns (address)",
+                    "event SrcEscrowCreated((bytes32,bytes32,uint256,uint256,uint256,uint256,uint256,uint256),(uint256,uint256,uint256,uint256,uint256))",
+                    "event DstEscrowCreated(address,bytes32,uint256)",
+                    "event WithdrawalCompleted(address,bytes32,uint256)",
+                    "event EscrowCancelled(address,uint256)"
+                ];
+            } else if (contractType === 'lop') {
+                contractAddress = config.lop;
+                abi = [
+                    "function fillOrder(address maker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount, string fromChain, string toChain, uint256 nonce, uint256 deadline, bytes signature) external",
+                    "function executeOrder(address maker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount, string fromChain, string toChain, uint256 nonce, uint256 deadline, bytes signature) external",
+                    "function validateOrder(address maker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount, string fromChain, string toChain, uint256 nonce, uint256 deadline, bytes signature) external view returns (bool)",
+                    "function cancelOrder(uint256 nonce) external",
+                    "function isOrderCancelled(address maker, uint256 nonce) external view returns (bool)",
+                    "event OrderFilled(address indexed maker, address indexed taker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount)",
+                    "event OrderCancelled(address indexed maker, uint256 nonce)"
+                ];
+            } else {
+                throw new Error(`Unknown contract type: ${contractType}`);
+            }
+            
+            const contract = new ethers.Contract(contractAddress, abi, signer || provider);
+            this.contracts.set(contractKey, contract);
+            
+            console.log(`✅ ${chainName} ${contractType} contract loaded: ${contractAddress}`);
         }
+        
+        return this.contracts.get(contractKey);
     }
 
     // Phase 1: Announcement Phase (as per 1inch Fusion+ spec)
@@ -136,17 +140,38 @@ class FusionPlusRelayer {
             const merkleTree = this.buildMerkleTree(secrets);
             const merkleRoot = merkleTree.getRoot();
             
-            // Create 1inch Fusion+ order with Dutch auction
+            // Validate required fields - NO DEFAULTS ALLOWED
+            if (!orderData.maker) throw new Error('maker address is required');
+            if (!orderData.fromChain) throw new Error('fromChain is required');
+            if (!orderData.toChain) throw new Error('toChain is required');
+            if (!orderData.makerAsset) throw new Error('fromToken address is required');
+            if (!orderData.takerAsset) throw new Error('toToken address is required');
+            if (!orderData.makerAmount) throw new Error('fromAmount is required');
+            if (!orderData.startPrice) throw new Error('startPrice is required');
+            if (!orderData.endPrice) throw new Error('endPrice is required');
+            if (!orderData.nonce) throw new Error('nonce is required');
+            if (!orderData.deadline) throw new Error('deadline is required');
+            if (!orderData.signature) throw new Error('signature is required');
+
+            // Create 1inch Fusion+ order - NO DEFAULTS, use actual user data
             const order = {
                 id: orderId,
-                maker: orderData.maker || this.config.DEPLOYER_ADDRESS,
-                makerAsset: orderData.makerAsset || ethers.ZeroAddress,
-                takerAsset: orderData.takerAsset || ethers.ZeroAddress,
-                makerAmount: ethers.parseEther(orderData.makerAmount || '1.0'),
-                startPrice: ethers.parseEther(orderData.startPrice || '1.0'),
-                endPrice: ethers.parseEther(orderData.endPrice || '0.95'),
-                auctionDuration: orderData.duration || 300000, // 5 minutes
+                maker: orderData.maker,
+                makerAsset: orderData.makerAsset,
+                takerAsset: orderData.takerAsset,
+                makerAmount: orderData.makerAmount,
+                startPrice: orderData.startPrice,
+                endPrice: orderData.endPrice,
+                auctionDuration: orderData.duration || 300000, // Only auction duration has default
                 partsAmount: partsAmount,
+                
+                // Cross-chain information - from user input only
+                fromChain: orderData.fromChain,
+                toChain: orderData.toChain,
+                nonce: orderData.nonce,
+                deadline: orderData.deadline,
+                signature: orderData.signature,
+                createdAt: orderData.createdAt || new Date().toISOString(),
                 
                 // Fusion+ specific fields
                 merkleRoot: merkleRoot.toString('hex'),
@@ -172,6 +197,13 @@ class FusionPlusRelayer {
                 baseFeeAtOrder: await this.getCurrentBaseFee('source'),
                 priceAdjustmentEnabled: orderData.gasAdjustment !== false
             };
+
+            // Get dynamic chain information
+            const chainInfo = await this.getChainInfo(order);
+            console.log(`🔄 Order ${orderId} setup:`);
+            console.log(`   📍 Source Chain: ${chainInfo.sourceChain} (${chainInfo.sourceContract})`);
+            console.log(`   📍 Destination Chain: ${chainInfo.destChain} (${chainInfo.destContract})`);
+            console.log(`   💱 Swap: ${order.fromChain} → ${order.toChain}`);
 
             // Store order and secrets
             this.orderBook.set(orderId, order);
@@ -229,17 +261,26 @@ class FusionPlusRelayer {
             // Check if price is profitable for resolvers
             try {
                 // Ensure adjustedPrice is not null/undefined and is a valid number
-                if (adjustedPrice != null && !isNaN(adjustedPrice)) {
-                    if (adjustedPrice <= order.endPrice || this.isOrderProfitable(order, adjustedPrice)) {
-                        console.log(`💰 Order ${orderId} became profitable at ${ethers.formatEther(adjustedPrice)} ETH`);
+                if (adjustedPrice != null && !isNaN(adjustedPrice) && typeof adjustedPrice === 'number') {
+                    const endPrice = typeof order.endPrice === 'string' ? 
+                        parseFloat(order.endPrice) : Number(order.endPrice);
+                    
+                    if (adjustedPrice <= endPrice || this.isOrderProfitable(order, adjustedPrice)) {
+                        console.log(`💰 Order ${orderId} became profitable at ${adjustedPrice} (${typeof adjustedPrice})`);
                         this.executeDepositPhase(orderId, adjustedPrice);
                         clearInterval(auctionInterval);
                     }
                 } else {
-                    console.warn(`⚠️ Invalid adjustedPrice for order ${orderId}:`, adjustedPrice);
+                    console.warn(`⚠️ Invalid adjustedPrice for order ${orderId}:`, adjustedPrice, typeof adjustedPrice);
                 }
             } catch (error) {
                 console.error(`❌ Error checking profitability for order ${orderId}:`, error.message);
+                console.error(`❌ Order data:`, { 
+                    adjustedPrice, 
+                    adjustedPriceType: typeof adjustedPrice,
+                    endPrice: order.endPrice,
+                    endPriceType: typeof order.endPrice
+                });
                 // Continue auction on error
             }
         }, 5000); // Check every 5 seconds
@@ -474,12 +515,32 @@ class FusionPlusRelayer {
 
     // Dutch Auction Price Calculation (Fusion+ spec)
     getCurrentAuctionPrice(order) {
-        const elapsed = Date.now() - order.announcementTime;
-        const progress = Math.min(elapsed / order.auctionDuration, 1);
-        
-        // Linear price decrease from start to end price
-        const priceRange = order.startPrice - order.endPrice;
-        return order.startPrice - (priceRange * BigInt(Math.floor(progress * 1000000)) / 1000000n);
+        try {
+            const elapsed = Date.now() - order.announcementTime;
+            const progress = Math.min(elapsed / order.auctionDuration, 1);
+            
+            // Convert prices to BigInt if they aren't already
+            const startPrice = typeof order.startPrice === 'string' ? 
+                ethers.parseEther(order.startPrice) : BigInt(order.startPrice);
+            const endPrice = typeof order.endPrice === 'string' ? 
+                ethers.parseEther(order.endPrice) : BigInt(order.endPrice);
+            
+            // Linear price decrease from start to end price
+            const priceRange = startPrice - endPrice;
+            const progressBigInt = BigInt(Math.floor(progress * 1000000));
+            const currentPrice = startPrice - (priceRange * progressBigInt / 1000000n);
+            
+            // Convert back to number for compatibility
+            return Number(ethers.formatEther(currentPrice));
+        } catch (error) {
+            console.error('❌ Error calculating auction price:', error.message);
+            // Fallback to a simple number calculation
+            const elapsed = Date.now() - order.announcementTime;
+            const progress = Math.min(elapsed / order.auctionDuration, 1);
+            const startPrice = parseFloat(order.startPrice) || 1.0;
+            const endPrice = parseFloat(order.endPrice) || 0.98;
+            return startPrice - ((startPrice - endPrice) * progress);
+        }
     }
 
     // Gas Price Adjustment (Fusion+ spec)
@@ -608,41 +669,165 @@ class FusionPlusRelayer {
         return '0x' + crypto.randomBytes(16).toString('hex');
     }
 
+    // Dynamically determine source and destination based on order - FULLY DYNAMIC
+    async getChainInfo(order) {
+        if (!order.fromChain || !order.toChain) {
+            throw new Error('Order must specify both fromChain and toChain');
+        }
+        
+        const sourceChain = order.fromChain;
+        const destChain = order.toChain;
+        
+        // Get dynamic providers and contracts
+        const sourceProvider = await this.getProvider(sourceChain);
+        const destProvider = await this.getProvider(destChain);
+        const sourceFactory = await this.getContract(sourceChain, 'escrowFactory');
+        const destFactory = await this.getContract(destChain, 'escrowFactory');
+        
+        const sourceConfig = this.networkConfigs[sourceChain];
+        const destConfig = this.networkConfigs[destChain];
+        
+        return {
+            sourceChain,
+            destChain,
+            sourceProvider,
+            destProvider,
+            sourceFactory,
+            destFactory,
+            sourceContract: sourceConfig.escrowFactory,
+            destContract: destConfig.escrowFactory
+        };
+    }
+
+    // Safe formatter that handles both BigInt and number values
+    safeFormatEther(value) {
+        try {
+            if (value === null || value === undefined || value === 0) {
+                return '0';
+            }
+            
+            // If it's already a string
+            if (typeof value === 'string') {
+                // If it's a decimal number (like "0.1"), return as is
+                if (value.includes('.') && !isNaN(parseFloat(value))) {
+                    return value;
+                }
+                // If it's a hex string, try to format as wei
+                if (value.startsWith('0x')) {
+                    try {
+                        return ethers.formatEther(value);
+                    } catch {
+                        return value;
+                    }
+                }
+                // If it's a large integer string (wei), format it
+                if (value.length > 15 && !value.includes('.')) {
+                    try {
+                        return ethers.formatEther(BigInt(value));
+                    } catch {
+                        return value;
+                    }
+                }
+                // Otherwise return as is
+                return value;
+            }
+            
+            // If it's a number, convert to string
+            if (typeof value === 'number') {
+                return value.toString();
+            }
+            
+            // If it's a BigInt, format it
+            if (typeof value === 'bigint') {
+                return ethers.formatEther(value);
+            }
+            
+            // Fallback: convert to string
+            return String(value);
+        } catch (error) {
+            console.error(`❌ Error formatting value ${value} (${typeof value}):`, error.message);
+            return String(value) || '0';
+        }
+    }
+
     // API Methods for external access
     getAllOrders() {
-        return Array.from(this.orderBook.values()).map(order => ({
-            id: order.id,
-            status: order.status,
-            phase: order.phase,
-            maker: order.maker,
-            announcementTime: order.announcementTime,
-            currentPrice: order.status === 'announced' ? 
-                ethers.formatEther(this.getCurrentAuctionPrice(order)) : 
-                order.finalPrice ? ethers.formatEther(order.finalPrice) : 'N/A',
-            safetyDeposit: ethers.formatEther(order.safetyDeposit),
-            partsAmount: order.partsAmount,
-            fillPercentage: order.currentFillPercentage || 100,
-            executionTime: order.completionTime ? 
-                `${(order.completionTime - order.announcementTime) / 1000}s` : 'Pending'
-        }));
+        return Array.from(this.orderBook.values()).map(order => {
+            try {
+                return {
+                    // UI expected format
+                    id: order.id,
+                    maker: order.maker,
+                    fromToken: order.makerAsset || '0x0000000000000000000000000000000000000000',
+                    toToken: order.takerAsset || '0x0000000000000000000000000000000000000000',
+                    fromAmount: this.safeFormatEther(order.makerAmount || order.startPrice || 0),
+                    toAmount: this.safeFormatEther(order.endPrice || 0),
+                    fromChain: order.fromChain,
+                    toChain: order.toChain,
+                    nonce: order.nonce,
+                    deadline: order.deadline,
+                    signature: order.signature,
+                    status: order.status || 'pending',
+                    createdAt: order.createdAt || new Date(order.announcementTime).toISOString(),
+                    
+                    // Additional relayer info
+                    phase: order.phase || this.getPhaseDescription(order.status),
+                    announcementTime: order.announcementTime,
+                    currentPrice: order.status === 'announced' ? 
+                        this.getCurrentAuctionPrice(order).toString() : 
+                        order.finalPrice ? this.safeFormatEther(order.finalPrice) : 'N/A',
+                    safetyDeposit: this.safeFormatEther(order.safetyDeposit || '1000000000000000000'),
+                    partsAmount: order.partsAmount || 4,
+                    fillPercentage: order.currentFillPercentage || 100,
+                    executionTime: order.completionTime ? 
+                        `${(order.completionTime - order.announcementTime) / 1000}s` : 'Pending'
+                };
+            } catch (error) {
+                console.error(`❌ Error formatting order ${order.id}:`, error.message);
+                return {
+                    id: order.id,
+                    error: 'Formatting error',
+                    status: order.status || 'unknown',
+                    maker: order.maker || '0x0000000000000000000000000000000000000000',
+                    fromToken: '0x0000000000000000000000000000000000000000',
+                    toToken: '0x0000000000000000000000000000000000000000',
+                    fromAmount: '0',
+                    toAmount: '0',
+                    fromChain: 'etherlink',
+                    toChain: 'ethereum',
+                    createdAt: new Date().toISOString()
+                };
+            }
+        });
     }
 
     async getStatus() {
         try {
-            const etherlinkBlock = await this.etherlinkProvider.getBlockNumber();
-            const sepoliaBlock = await this.sepoliaProvider.getBlockNumber();
+            const connections = {};
+            const contracts = {};
+            
+            // Get status for all configured networks dynamically
+            for (const [chainName, config] of Object.entries(this.networkConfigs)) {
+                try {
+                    if (this.providers.has(chainName)) {
+                        const provider = this.providers.get(chainName);
+                        const block = await provider.getBlockNumber();
+                        connections[chainName] = { connected: true, block };
+                        contracts[chainName] = config.escrowFactory;
+                    } else {
+                        connections[chainName] = { connected: false, reason: 'Not initialized' };
+                    }
+                } catch (error) {
+                    connections[chainName] = { connected: false, error: error.message };
+                }
+            }
             
             return {
                 protocol: '1inch Fusion+',
                 status: 'active',
-                connections: {
-                    etherlink: { connected: true, block: etherlinkBlock },
-                    sepolia: { connected: true, block: sepoliaBlock }
-                },
-                contracts: {
-                    etherlink: '0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff',
-                    sepolia: '0xd76e13de08cfF2d3463Ce8c1a78a2A86E631E312'
-                },
+                mode: 'dynamic',
+                connections,
+                contracts,
                 orders: {
                     total: this.orderBook.size,
                     active: Array.from(this.orderBook.values()).filter(o => 
@@ -658,6 +843,7 @@ class FusionPlusRelayer {
                     cancellationPeriod: `${this.CANCELLATION_PERIOD / 1000}s`,
                     safetyDeposit: ethers.formatEther(this.SAFETY_DEPOSIT_AMOUNT)
                 },
+                supportedNetworks: Object.keys(this.networkConfigs),
                 uptime: process.uptime()
             };
         } catch (error) {
@@ -673,21 +859,34 @@ class FusionPlusRelayer {
         try {
             console.log('🔍 Testing 1inch Fusion+ infrastructure...');
             
-            const etherlinkBlock = await this.etherlinkProvider.getBlockNumber();
-            const sepoliaBlock = await this.sepoliaProvider.getBlockNumber();
+            // Test all configured networks dynamically
+            const results = [];
+            for (const [chainName, config] of Object.entries(this.networkConfigs)) {
+                try {
+                    const provider = await this.getProvider(chainName);
+                    const block = await provider.getBlockNumber();
+                    console.log(`✅ ${chainName} connected - Block: ${block}`);
+                    
+                    // Test contract access
+                    const factory = await this.getContract(chainName, 'escrowFactory');
+                    const owner = await factory.owner();
+                    console.log(`✅ ${chainName} escrowFactory owner: ${owner}`);
+                    
+                    results.push({ chain: chainName, success: true, block, owner });
+                } catch (error) {
+                    console.error(`❌ ${chainName} connection failed:`, error.message);
+                    results.push({ chain: chainName, success: false, error: error.message });
+                }
+            }
             
-            console.log(`✅ Etherlink (Source) connected - Block: ${etherlinkBlock}`);
-            console.log(`✅ Sepolia (Destination) connected - Block: ${sepoliaBlock}`);
+            const allSuccessful = results.every(r => r.success);
+            if (allSuccessful) {
+                console.log('✅ 1inch Fusion+ protocol ready for bidirectional cross-chain swaps');
+            } else {
+                console.warn('⚠️ Some networks failed connection tests');
+            }
             
-            // Test contract calls
-            const etherlinkOwner = await this.etherlinkFactory.owner();
-            const sepoliaOwner = await this.sepoliaFactory.owner();
-            
-            console.log(`✅ Etherlink contract owner: ${etherlinkOwner}`);
-            console.log(`✅ Sepolia contract owner: ${sepoliaOwner}`);
-            
-            console.log('✅ 1inch Fusion+ protocol ready for cross-chain swaps');
-            return true;
+            return allSuccessful;
             
         } catch (error) {
             console.error('❌ Connection test failed:', error.message);

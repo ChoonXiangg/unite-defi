@@ -3,10 +3,6 @@ const express = require('express');
 const { WebSocketServer } = require('ws');
 const FusionPlusRelayer = require('./src/FusionPlusRelayer');
 
-console.log('🚀 Starting 1inch Fusion+ Relayer...');
-console.log('📖 Based on official 1inch Fusion+ specification');
-console.log('🔗 https://1inch.io/assets/1inch-fusion-plus.pdf');
-
 const app = express();
 const wss = new WebSocketServer({ port: 8080 });
 
@@ -21,10 +17,6 @@ const config = {
 let relayer;
 try {
     relayer = new FusionPlusRelayer(config);
-    console.log('✅ 1inch Fusion+ Relayer initialized successfully');
-    console.log('🏗️  Contracts deployed:');
-    console.log('   📍 Etherlink (Source): 0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff');
-    console.log('   📍 Sepolia (Destination): 0xd76e13de08cfF2d3463Ce8c1a78a2A86E631E312');
 } catch (error) {
     console.error('❌ Failed to initialize 1inch Fusion+ relayer:', error.message);
     process.exit(1);
@@ -50,24 +42,17 @@ app.get('/', (req, res) => {
         protocol: '1inch Fusion+',
         message: 'Intent-based Atomic Cross-Chain Swaps',
         specification: 'https://1inch.io/assets/1inch-fusion-plus.pdf',
-        contracts: {
-            etherlink: {
-                address: '0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff',
-                role: 'Source Chain',
-                network: 'Etherlink Ghostnet'
-            },
-            sepolia: {
-                address: '0xd76e13de08cfF2d3463Ce8c1a78a2A86E631E312',
-                role: 'Destination Chain',
-                network: 'Ethereum Sepolia'
-            }
-        },
+        mode: 'dynamic',
+        description: 'Networks and contracts connected on-demand based on user orders',
+        supportedNetworks: ['etherlink', 'ethereum'],
         features: [
             'Dutch Auction Mechanism',
             'Partial Fill Support with Merkle Trees',
             'Safety Deposit System',
             'Gas Price Adjustments',
-            '4-Phase Atomic Swap Protocol'
+            '4-Phase Atomic Swap Protocol',
+            'Dynamic Network Connection',
+            'Bidirectional Cross-Chain Swaps'
         ],
         status: 'running',
         timestamp: new Date().toISOString()
@@ -90,19 +75,46 @@ app.post('/api/orders', async (req, res) => {
     try {
         console.log('📝 New 1inch Fusion+ order received:', req.body);
         
-        // Validate order data
+        // Validate required fields - NO DEFAULTS
+        if (!req.body.maker) throw new Error('maker address is required');
+        if (!req.body.fromChain) throw new Error('fromChain is required');
+        if (!req.body.toChain) throw new Error('toChain is required');
+        if (!req.body.fromToken) throw new Error('fromToken address is required');
+        if (!req.body.toToken) throw new Error('toToken address is required');
+        if (!req.body.fromAmount) throw new Error('fromAmount is required');
+        if (!req.body.toAmount) throw new Error('toAmount is required');
+        if (!req.body.nonce) throw new Error('nonce is required');
+        if (!req.body.deadline) throw new Error('deadline is required');
+        if (!req.body.signature) throw new Error('signature is required');
+
+        // Map UI order format to relayer format - NO DEFAULTS
         const orderData = {
-            maker: req.body.maker || config.DEPLOYER_ADDRESS,
-            makerAsset: req.body.makerAsset || '0x0000000000000000000000000000000000000000',
-            takerAsset: req.body.takerAsset || '0x0000000000000000000000000000000000000000',
-            makerAmount: req.body.makerAmount || '1.0',
-            startPrice: req.body.startPrice || '1.0',
-            endPrice: req.body.endPrice || '0.95',
-            duration: req.body.duration || 300000, // 5 minutes
-            partsAmount: req.body.partsAmount || 4,
-            gasAdjustment: req.body.gasAdjustment !== false
+            // Basic order info - from user input only
+            maker: req.body.maker,
+            makerAsset: req.body.fromToken,
+            takerAsset: req.body.toToken,
+            makerAmount: req.body.fromAmount,
+            
+            // Price and auction settings - from user input only
+            startPrice: req.body.fromAmount,
+            endPrice: req.body.toAmount,
+            duration: 300000, // Only auction duration has default
+            partsAmount: 4,
+            gasAdjustment: true,
+            
+            // Cross-chain info - from user input only
+            fromChain: req.body.fromChain,
+            toChain: req.body.toChain,
+            nonce: req.body.nonce,
+            deadline: req.body.deadline,
+            signature: req.body.signature,
+            
+            // Additional metadata
+            createdAt: new Date().toISOString(),
+            status: 'pending'
         };
         
+        console.log('🔄 Mapped order data:', orderData);
         const result = await relayer.announceOrder(orderData);
         
         res.json({ 
@@ -130,10 +142,17 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
+// Helper function to safely serialize BigInt values
+function safeBigIntStringify(obj) {
+    return JSON.parse(JSON.stringify(obj, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+    ));
+}
+
 app.get('/api/orders', (req, res) => {
     try {
         const orders = relayer.getAllOrders();
-        res.json({ 
+        const response = { 
             protocol: '1inch Fusion+',
             orders, 
             count: orders.length,
@@ -145,8 +164,13 @@ app.get('/api/orders', (req, res) => {
                 completed: orders.filter(o => o.status === 'completed').length,
                 recovered: orders.filter(o => o.status === 'recovered').length
             }
-        });
+        };
+        
+        // Safely serialize any remaining BigInt values
+        const safeResponse = safeBigIntStringify(response);
+        res.json(safeResponse);
     } catch (error) {
+        console.error('❌ Error in /api/orders:', error.message);
         res.status(500).json({ 
             protocol: '1inch Fusion+',
             error: error.message 
@@ -240,37 +264,12 @@ wss.on('connection', (ws) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3001;
 const server = app.listen(PORT, () => {
-    console.log('');
-    console.log('✅ 1inch Fusion+ Relayer Server running!');
-    console.log('📖 Implementing official 1inch Fusion+ specification');
-    console.log('');
-    console.log('🌐 Server Details:');
-    console.log(`   HTTP API: http://localhost:${PORT}`);
-    console.log('   WebSocket: ws://localhost:8080');
-    console.log('');
-    console.log('🏭 Cross-Chain Infrastructure:');
-    console.log('   Source Chain:      Etherlink Ghostnet');
-    console.log('   Destination Chain: Ethereum Sepolia');
-    console.log('   Contract (Source): 0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff');
-    console.log('   Contract (Dest):   0xd76e13de08cfF2d3463Ce8c1a78a2A86E631E312');
-    console.log('');
-    console.log('📋 Available endpoints:');
-    console.log(`   GET  http://localhost:${PORT}/`);
-    console.log(`   GET  http://localhost:${PORT}/api/status`);
-    console.log(`   GET  http://localhost:${PORT}/api/protocol`);
-    console.log(`   GET  http://localhost:${PORT}/api/test-connection`);
-    console.log(`   POST http://localhost:${PORT}/api/orders`);
-    console.log(`   GET  http://localhost:${PORT}/api/orders`);
-    console.log('');
-    console.log('🔄 4-Phase Protocol:');
-    console.log('   Phase 1: Announcement (Dutch Auction)');
-    console.log('   Phase 2: Deposit (Escrow Creation)'); 
-    console.log('   Phase 3: Withdrawal (Secret Revelation)');
-    console.log('   Phase 4: Recovery (Cancellation if needed)');
-    console.log('');
-    console.log('🎯 Ready for 1inch Fusion+ cross-chain swaps!');
+    console.log('🚀 1inch Fusion+ Relayer running on port', PORT);
+    console.log('📖 Specification: https://1inch.io/assets/1inch-fusion-plus.pdf');
+    console.log('🔧 Mode: Dynamic (networks connected on-demand)');
+    console.log('📋 API: http://localhost:' + PORT);
 });
 
 // Graceful shutdown

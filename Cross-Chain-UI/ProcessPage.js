@@ -264,8 +264,31 @@ const ProcessPage = () => {
             {userOrders.map((order) => {
               const fromTokenSymbol = getTokenSymbol(order.fromToken, order.fromChain);
               const toTokenSymbol = getTokenSymbol(order.toToken, order.toChain);
-              const fromAmount = ethers.formatEther(order.fromAmount);
-              const toAmount = ethers.formatEther(order.toAmount);
+              
+              // Safe amount formatting with wei detection
+              const safeFormatAmount = (amount) => {
+                if (!amount || amount === null || amount === undefined) {
+                  return '0';
+                }
+                
+                const amountStr = amount.toString();
+                
+                // If it's a very large number (likely wei), format from wei to ether
+                if (!amountStr.includes('.') && amountStr.length >= 12) {
+                  try {
+                    return parseFloat(ethers.formatEther(amountStr)).toFixed(6);
+                  } catch (error) {
+                    console.error('Error formatting wei amount in ProcessPage:', amountStr, error);
+                    return parseFloat(amountStr).toFixed(6);
+                  }
+                }
+                
+                // If it's already a decimal or small number, return as is
+                return parseFloat(amountStr).toFixed(6);
+              };
+              
+              const fromAmount = safeFormatAmount(order.fromAmount);
+              const toAmount = safeFormatAmount(order.toAmount);
               const progressSteps = getProgressSteps(order);
               
               return (
