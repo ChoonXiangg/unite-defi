@@ -33,6 +33,18 @@ try {
 // REST API
 app.use(express.json());
 
+// CORS middleware - Allow requests from your UI
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 app.get('/', (req, res) => {
     res.json({
         protocol: '1inch Fusion+',
@@ -228,7 +240,7 @@ wss.on('connection', (ws) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 const server = app.listen(PORT, () => {
     console.log('');
     console.log('✅ 1inch Fusion+ Relayer Server running!');

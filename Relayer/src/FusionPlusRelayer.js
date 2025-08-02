@@ -73,21 +73,47 @@ class FusionPlusRelayer {
             "event EscrowCancelled(address,uint256)"
         ];
 
+        // LimitOrderProtocol ABI for your deployed LOP contracts
+        const lopABI = [
+            "function fillOrder(address maker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount, string fromChain, string toChain, uint256 nonce, uint256 deadline, bytes signature) external",
+            "function executeOrder(address maker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount, string fromChain, string toChain, uint256 nonce, uint256 deadline, bytes signature) external",
+            "function validateOrder(address maker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount, string fromChain, string toChain, uint256 nonce, uint256 deadline, bytes signature) external view returns (bool)",
+            "function cancelOrder(uint256 nonce) external",
+            "function isOrderCancelled(address maker, uint256 nonce) external view returns (bool)",
+            "event OrderFilled(address indexed maker, address indexed taker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount)",
+            "event OrderCancelled(address indexed maker, uint256 nonce)"
+        ];
+
         try {
-            // Your deployed contract addresses
+            // EscrowFactory contracts
             this.etherlinkFactory = new ethers.Contract(
-                '0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff', // Etherlink (Source Chain)
+                process.env.ETHERLINK_ESCROW_FACTORY_ADDRESS || '0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff',
                 escrowFactoryABI,
                 this.etherlinkSigner || this.etherlinkProvider
             );
 
             this.sepoliaFactory = new ethers.Contract(
-                '0xd76e13de08cfF2d3463Ce8c1a78a2A86E631E312', // Sepolia (Destination Chain)
+                process.env.SEPOLIA_ESCROW_FACTORY_ADDRESS || '0xd76e13de08cfF2d3463Ce8c1a78a2A86E631E312',
                 escrowFactoryABI,
                 this.sepoliaSigner || this.sepoliaProvider
             );
 
+            // LimitOrderProtocol contracts
+            this.etherlinkLOP = new ethers.Contract(
+                process.env.ETHERLINK_HYBRID_LOP_ADDRESS || '0xf4C21603E2A717aC176880Bf7EB00E560A4459ab',
+                lopABI,
+                this.etherlinkSigner || this.etherlinkProvider
+            );
+
+            this.sepoliaLOP = new ethers.Contract(
+                process.env.SEPOLIA_HYBRID_LOP_ADDRESS || '0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff',
+                lopABI,
+                this.sepoliaSigner || this.sepoliaProvider
+            );
+
             console.log('✅ 1inch Fusion+ contract interfaces loaded');
+            console.log('📍 Etherlink LOP:', process.env.ETHERLINK_HYBRID_LOP_ADDRESS || '0xf4C21603E2A717aC176880Bf7EB00E560A4459ab');
+            console.log('📍 Sepolia LOP:', process.env.SEPOLIA_HYBRID_LOP_ADDRESS || '0xCfDE9a76C9D0e3f0220Ff15deD434cE3968f63Ff');
         } catch (error) {
             console.error('❌ Contract setup failed:', error.message);
             throw error;
@@ -183,14 +209,38 @@ class FusionPlusRelayer {
             const currentPrice = this.getCurrentAuctionPrice(order);
             
             // Apply gas price adjustments if enabled (Fusion+ feature)
-            const adjustedPrice = order.priceAdjustmentEnabled ? 
-                this.applyGasAdjustment(order, currentPrice) : currentPrice;
+            let adjustedPrice = currentPrice;
+            if (order.priceAdjustmentEnabled) {
+                try {
+                    const gasAdjustment = this.applyGasAdjustment(order, currentPrice);
+                    // Handle if applyGasAdjustment returns a Promise
+                    if (gasAdjustment && typeof gasAdjustment.then === 'function') {
+                        console.warn(`⚠️ Gas adjustment returned Promise for order ${orderId}, using currentPrice`);
+                        adjustedPrice = currentPrice;
+                    } else {
+                        adjustedPrice = gasAdjustment;
+                    }
+                } catch (error) {
+                    console.error(`❌ Error in gas adjustment for order ${orderId}:`, error.message);
+                    adjustedPrice = currentPrice;
+                }
+            }
             
             // Check if price is profitable for resolvers
-            if (adjustedPrice <= order.endPrice || this.isOrderProfitable(order, adjustedPrice)) {
-                console.log(`💰 Order ${orderId} became profitable at ${ethers.formatEther(adjustedPrice)} ETH`);
-                this.executeDepositPhase(orderId, adjustedPrice);
-                clearInterval(auctionInterval);
+            try {
+                // Ensure adjustedPrice is not null/undefined and is a valid number
+                if (adjustedPrice != null && !isNaN(adjustedPrice)) {
+                    if (adjustedPrice <= order.endPrice || this.isOrderProfitable(order, adjustedPrice)) {
+                        console.log(`💰 Order ${orderId} became profitable at ${ethers.formatEther(adjustedPrice)} ETH`);
+                        this.executeDepositPhase(orderId, adjustedPrice);
+                        clearInterval(auctionInterval);
+                    }
+                } else {
+                    console.warn(`⚠️ Invalid adjustedPrice for order ${orderId}:`, adjustedPrice);
+                }
+            } catch (error) {
+                console.error(`❌ Error checking profitability for order ${orderId}:`, error.message);
+                // Continue auction on error
             }
         }, 5000); // Check every 5 seconds
     }
@@ -466,9 +516,45 @@ class FusionPlusRelayer {
     }
 
     isOrderProfitable(order, currentPrice) {
-        // Simple profitability check (can be enhanced)
-        const minProfitMargin = ethers.parseEther('0.01'); // 0.01 ETH minimum profit
-        return (order.startPrice - currentPrice) >= minProfitMargin;
+        try {
+            // Simple profitability check (can be enhanced)
+            const minProfitMargin = ethers.parseEther('0.01'); // 0.01 ETH minimum profit
+            
+            // Handle Promise rejection - if currentPrice is a Promise, skip this check
+            if (currentPrice && typeof currentPrice.then === 'function') {
+                console.warn('⚠️ currentPrice is a Promise, skipping profitability check');
+                return false;
+            }
+            
+            // Convert to BigInt if needed, with better type checking
+            let startPrice;
+            if (typeof order.startPrice === 'string') {
+                startPrice = ethers.parseEther(order.startPrice);
+            } else if (typeof order.startPrice === 'number') {
+                startPrice = ethers.parseEther(order.startPrice.toString());
+            } else {
+                startPrice = BigInt(order.startPrice);
+            }
+            
+            let currentPriceBigInt;
+            if (typeof currentPrice === 'string') {
+                currentPriceBigInt = ethers.parseEther(currentPrice);
+            } else if (typeof currentPrice === 'number') {
+                currentPriceBigInt = ethers.parseEther(currentPrice.toString());
+            } else {
+                currentPriceBigInt = BigInt(currentPrice);
+            }
+            
+            const profitable = (startPrice - currentPriceBigInt) >= minProfitMargin;
+            console.log(`🔍 Profitability check: startPrice=${ethers.formatEther(startPrice)}, currentPrice=${ethers.formatEther(currentPriceBigInt)}, profitable=${profitable}`);
+            
+            return profitable;
+        } catch (error) {
+            console.error('❌ Error in profitability check:', error.message);
+            console.error('❌ Order data:', JSON.stringify(order, null, 2));
+            console.error('❌ Current price:', currentPrice);
+            return false; // Default to not profitable if calculation fails
+        }
     }
 
     // Contract Interaction Methods
