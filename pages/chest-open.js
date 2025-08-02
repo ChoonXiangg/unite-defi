@@ -61,6 +61,17 @@ export default function ChestOpen() {
     'water wing.svg'
   ];
 
+  // TEST-MODE: seed drawnNFTs so only rainbow parts remain
+  useEffect(() => {
+    if (!localStorage.getItem('initialPresetComplete')) return;
+    const drawn = JSON.parse(localStorage.getItem('drawnNFTs') || '[]');
+    if (drawn.length === 0) {
+      // mark all non-rainbow parts as already drawn
+      const defaultDrawn = drawableNFTs.filter(nft => !nft.startsWith('rainbow '));
+      localStorage.setItem('drawnNFTs', JSON.stringify(defaultDrawn));
+    }
+  }, []);
+
   const drawRandomNFT = () => {
     // Get drawn NFTs from localStorage
     const drawnNFTsStored = JSON.parse(localStorage.getItem('drawnNFTs') || '[]');

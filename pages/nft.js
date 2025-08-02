@@ -198,6 +198,36 @@ export default function NFT() {
     
     // Load owned NFTs from localStorage
     const loadOwnedNFTs = () => {
+      // --- TEST-MODE PRESET: only run once ---
+      if (!localStorage.getItem('initialPresetComplete')) {
+        // 1) Own everything except rainbow
+        const defaultOwned = allNFTs.filter(nft => !nft.startsWith('rainbow '));
+        localStorage.setItem('ownedNFTs', JSON.stringify(defaultOwned));
+
+        // 2) Mark all non-rainbow Pegasi as already unlocked
+        const defaultUnlocked = defaultOwned.filter(nft => nft.includes('pegasus.svg'));
+        localStorage.setItem('unlockedPegasus', JSON.stringify(defaultUnlocked));
+
+        // 3) Mark all non-rainbow parts as already drawn (so only rainbow parts remain)
+        const defaultDrawnParts = drawableNFTs.filter(nft => !nft.startsWith('rainbow '));
+        localStorage.setItem('drawnNFTs', JSON.stringify(defaultDrawnParts));
+
+        // 4) Flag so we don't overwrite again
+        localStorage.setItem('initialPresetComplete', 'true');
+
+        // Initialize state and bail out
+        setOwnedNFTs(defaultOwned);
+        
+        // Load PGS balance from localStorage
+        const storedBalance = localStorage.getItem('pgsBalance');
+        if (storedBalance) {
+          setPgsBalance(parseFloat(storedBalance));
+        }
+        
+        return;
+      }
+
+      // 🎯 Existing behavior for subsequent loads
       const ownedNFTsStored = JSON.parse(localStorage.getItem('ownedNFTs') || '[]');
       
       // Clean up any incorrect "horm" entries from localStorage
