@@ -13,32 +13,20 @@ const geistMono = Geist_Mono({
 });
 
 export default function NFT() {
-  const [isChestOpen, setIsChestOpen] = useState(false);
-  
   // Wallet states
   const [walletService] = useState(() => new WalletService());
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
 
   // Owned NFTs (colored/normal display)
-  const ownedNFTs = [
-    'fire pegasus.svg',
-    'air body.svg',
-    'water head.svg',
-    'rainbow wing.svg'
-  ];
+  const [ownedNFTs, setOwnedNFTs] = useState([]);
 
-  // Unowned NFTs (greyscale) - organized by type and element
-  const unownedNFTs = [
-    // Complete pegasus first
-    'air pegasus.svg',
-    'earth pegasus.svg', 
-    'rainbow pegasus.svg',
-    'water pegasus.svg',
-    
-    // Air element parts (excluding owned)
+  // Drawable NFTs (excludes pegasus NFTs)
+  const drawableNFTs = [
+    // Air element parts
+    'air body.svg',
     'air head.svg',
-    'air horm.svg',
+    'air horn.svg',
     'air leg.svg',
     'air tail.svg',
     'air wing.svg',
@@ -51,7 +39,7 @@ export default function NFT() {
     'earth tail.svg',
     'earth wing.svg',
     
-    // Fire element parts (excluding owned pegasus)
+    // Fire element parts
     'fire body.svg',
     'fire head.svg',
     'fire horn.svg',
@@ -59,21 +47,105 @@ export default function NFT() {
     'fire tail.svg',
     'fire wing.svg',
     
-    // Rainbow element parts (excluding owned wing)
+    // Rainbow element parts
     'rainbow body.svg',
     'rainbow head.svg',
     'rainbow horn.svg',
     'rainbow leg.svg',
     'rainbow tail.svg',
+    'rainbow wing.svg',
     
-    // Water element parts (excluding owned head)
+    // Water element parts
     'water body.svg',
+    'water head.svg',
     'water horn.svg',
     'water leg.svg',
-    'water pegasus.svg',
     'water tail.svg',
     'water wing.svg'
   ];
+
+  // All possible NFTs in the collection
+  const allNFTs = [
+    'fire pegasus.svg',
+    'air body.svg',
+    'water head.svg',
+    'rainbow wing.svg',
+    'air pegasus.svg',
+    'earth pegasus.svg', 
+    'rainbow pegasus.svg',
+    'water pegasus.svg',
+    'air head.svg',
+    'air horn.svg',
+    'air leg.svg',
+    'air tail.svg',
+    'air wing.svg',
+    'earth body.svg',
+    'earth head.svg',
+    'earth horn.svg',
+    'earth leg.svg',
+    'earth tail.svg',
+    'earth wing.svg',
+    'fire body.svg',
+    'fire head.svg',
+    'fire horn.svg',
+    'fire leg.svg',
+    'fire tail.svg',
+    'fire wing.svg',
+    'rainbow body.svg',
+    'rainbow head.svg',
+    'rainbow horn.svg',
+    'rainbow leg.svg',
+    'rainbow tail.svg',
+    'water body.svg',
+    'water horn.svg',
+    'water leg.svg',
+    'water tail.svg',
+    'water wing.svg'
+  ];
+
+  // Filter unowned NFTs dynamically
+  const unownedNFTs = allNFTs.filter(nft => !ownedNFTs.includes(nft));
+
+  // Pegasus unlock detection
+  const checkForPegasusUnlocks = (ownedNFTsList) => {
+    const pegasusTypes = ['air', 'earth', 'fire', 'rainbow', 'water'];
+    const requiredParts = ['body', 'head', 'horn', 'leg', 'tail', 'wing'];
+    
+    // Get already unlocked pegasus from localStorage
+    const unlockedPegasus = JSON.parse(localStorage.getItem('unlockedPegasus') || '[]');
+    
+    pegasusTypes.forEach(pegasusType => {
+      // Skip if already unlocked
+      if (unlockedPegasus.includes(`${pegasusType} pegasus.svg`)) {
+        return;
+      }
+      
+      // Check if all parts are collected
+      const collectedParts = requiredParts.filter(part => 
+        ownedNFTsList.includes(`${pegasusType} ${part}.svg`)
+      );
+      
+      console.log(`${pegasusType} pegasus: ${collectedParts.length}/6 parts collected`, collectedParts);
+      
+      if (collectedParts.length === 6) {
+        console.log(`🎉 Unlocking ${pegasusType} pegasus!`);
+        // All parts collected! Unlock the pegasus
+        const newUnlockedPegasus = [...unlockedPegasus, `${pegasusType} pegasus.svg`];
+        localStorage.setItem('unlockedPegasus', JSON.stringify(newUnlockedPegasus));
+        
+        // Add pegasus to owned collection
+        const updatedOwnedNFTs = [...ownedNFTsList, `${pegasusType} pegasus.svg`];
+        localStorage.setItem('ownedNFTs', JSON.stringify(updatedOwnedNFTs));
+        setOwnedNFTs(updatedOwnedNFTs);
+        
+        // Navigate to unlock celebration page
+        console.log(`Navigating to: /pegasus-unlock?pegasus=${pegasusType}`);
+        setTimeout(() => {
+          window.location.href = `/pegasus-unlock?pegasus=${pegasusType}`;
+        }, 500);
+      }
+    });
+  };
 
   useEffect(() => {
     // Check if wallet is already connected
@@ -89,17 +161,49 @@ export default function NFT() {
       }
     };
     
+    // Load owned NFTs from localStorage
+    const loadOwnedNFTs = () => {
+      const ownedNFTsStored = JSON.parse(localStorage.getItem('ownedNFTs') || '[]');
+      
+      // Clean up any incorrect "horm" entries from localStorage
+      const cleanedOwnedNFTs = ownedNFTsStored.filter(nft => nft !== 'air horm.svg');
+      
+      // Update localStorage if we removed any incorrect entries
+      if (cleanedOwnedNFTs.length !== ownedNFTsStored.length) {
+        localStorage.setItem('ownedNFTs', JSON.stringify(cleanedOwnedNFTs));
+      }
+      
+      setOwnedNFTs(cleanedOwnedNFTs);
+      
+      // Check for pegasus unlocks
+      checkForPegasusUnlocks(cleanedOwnedNFTs);
+    };
+    
     checkWalletConnection();
+    loadOwnedNFTs();
   }, [walletService]);
 
-  const handleChestClick = () => {
-    setIsChestOpen(!isChestOpen);
+  const handleOpenChest = () => {
+    // Check if all NFTs have been collected
+    const drawnNFTsStored = JSON.parse(localStorage.getItem('drawnNFTs') || '[]');
+    const availableNFTs = drawableNFTs.filter(nft => !drawnNFTsStored.includes(nft));
+    
+    if (availableNFTs.length === 0) {
+      // All NFTs have been collected
+      alert('🎉 Congratulations! You have collected everything in the collection! All NFTs have been unlocked!');
+    } else {
+      // Still have NFTs to collect, go to chest page
+      window.location.href = '/chest-open';
+    }
   };
 
   return (
-    <div className={`${geistSans.className} ${geistMono.className} min-h-screen relative`} style={{
-      background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)'
-    }}>
+    <div 
+      className={`${geistSans.className} ${geistMono.className} min-h-screen relative`} 
+      style={{
+        background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)'
+      }}
+    >
       
       {/* Navbar with same styling as other pages */}
       <nav className="bg-gray-800/90 backdrop-blur-md border-b border-gray-600/50 sticky top-0 z-50 shadow-xl">
@@ -170,93 +274,99 @@ export default function NFT() {
       </nav>
 
       {/* Main Content */}
-      <div className="main-content flex min-h-[calc(100vh-120px)] p-8 gap-8">
+      <div className="main-content flex min-h-[calc(100vh-120px)] p-8 gap-8 relative">
         {/* Left Side - Collections */}
         <div className="collections-sidebar w-1/2">
           <div className="bg-gray-800/90 rounded-2xl border border-gray-600/50 backdrop-blur-md shadow-xl overflow-hidden">
             <div className="p-6 border-b border-gray-700">
               <h2 className="text-xl font-bold text-white mb-2 font-supercell">Collections</h2>
-              <div className="text-sm text-gray-400">{pegasusCollection.length} items</div>
             </div>
             <div className="p-4 max-h-[calc(100vh-300px)] overflow-y-auto">
-              <div className="collections-grid grid grid-cols-4 gap-3">
-                {pegasusCollection.map((item, index) => {
-                  const itemName = item.replace('.svg', '').replace(/\b\w/g, l => l.toUpperCase());
-                  return (
-                    <div 
-                      key={index}
-                      className="bg-gray-700/50 rounded-lg border border-gray-600/30 p-3 hover:bg-gray-600/50 transition-colors cursor-pointer"
-                    >
-                      <div className="aspect-square mb-2">
-                        <img 
-                          src={`/pegasus/${item}`}
-                          alt={itemName}
-                          className="w-full h-full object-contain"
-                          style={{ filter: 'grayscale(100%)' }}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
+              
+              {/* Owned Section */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-white font-supercell">Owned</h3>
+                  <span className="text-sm text-gray-400">{ownedNFTs.length} nft</span>
+                </div>
+                <div className="collections-grid grid grid-cols-4 gap-3 mb-4">
+                  {ownedNFTs.map((item, index) => {
+                    const itemName = item.replace('.svg', '').replace(/\b\w/g, l => l.toUpperCase());
+                    return (
+                      <div 
+                        key={`owned-${index}`}
+                        className="bg-gray-700/50 rounded-lg border border-gray-600/30 p-3 hover:bg-gray-600/50 transition-colors cursor-pointer"
+                      >
+                        <div className="aspect-square mb-2">
+                          <img 
+                            src={`/pegasus/${item}`}
+                            alt={itemName}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-300 text-center font-supercell truncate">
+                          {itemName}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-300 text-center font-supercell truncate">
-                        {itemName}
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Unowned Section */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-white font-supercell">Unowned</h3>
+                  <span className="text-sm text-gray-400">{unownedNFTs.length} nft</span>
+                </div>
+                <div className="collections-grid grid grid-cols-4 gap-3">
+                  {unownedNFTs.map((item, index) => {
+                    const itemName = item.replace('.svg', '').replace(/\b\w/g, l => l.toUpperCase());
+                    return (
+                      <div 
+                        key={`unowned-${index}`}
+                        className="bg-gray-700/50 rounded-lg border border-gray-600/30 p-3 hover:bg-gray-600/50 transition-colors cursor-pointer"
+                      >
+                        <div className="aspect-square mb-2">
+                          <img 
+                            src={`/pegasus/${item}`}
+                            alt={itemName}
+                            className="w-full h-full object-contain"
+                            style={{ filter: 'grayscale(100%)' }}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-300 text-center font-supercell truncate">
+                          {itemName}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Side - Chest Container */}
+        {/* Right Side - Content Area */}
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            {/* Chest Container */}
-            <div className="relative">
-              <div 
-                className="chest-container relative w-64 h-48 mx-auto cursor-pointer"
-                onClick={handleChestClick}
+            <div className="bg-gray-800/90 rounded-2xl border border-gray-600/50 backdrop-blur-md shadow-xl p-8">
+              <h2 className="text-2xl font-bold text-white mb-4 font-supercell">Open a Chest</h2>
+              <p className="text-gray-300 mb-6 font-supercell">
+                Discover rare NFTs from the Pegasus Collection!
+              </p>
+              <button
+                onClick={handleOpenChest}
+                className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-600 hover:from-yellow-500 hover:via-orange-600 hover:to-red-700 text-white font-bold py-4 px-8 rounded-xl text-lg font-supercell transition-all duration-300 transform hover:scale-105 shadow-lg"
               >
-                {/* Closed chest */}
-                <div 
-                  className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ease-in-out ${
-                    isChestOpen ? 'opacity-0' : 'opacity-100'
-                  }`}
-                >
-                  <img 
-                    src="/close-chest-original.svg" 
-                    alt="Closed Chest" 
-                    className="w-40 h-30 object-contain"
-                  />
-                </div>
-                
-                {/* Open chest */}
-                <div 
-                  className={`absolute inset-0 flex items-center justify-center transition-opacity duration-500 ease-in-out ${
-                    isChestOpen ? 'opacity-100' : 'opacity-0'
-                  }`}
-                >
-                  <img 
-                    src="/open-chest-original.svg" 
-                    alt="Open Chest" 
-                    className="w-40 h-30 object-contain"
-                    style={{ transform: 'scale(1.05)' }}
-                  />
-                </div>
-                
-                {/* Glow effect when open */}
-                <div 
-                  className={`absolute inset-0 rounded-full transition-opacity duration-500 ease-in-out ${
-                    isChestOpen ? 'opacity-100' : 'opacity-0'
-                  }`}
-                  style={{
-                    background: 'radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.1) 50%, transparent 100%)',
-                    filter: 'blur(8px)',
-                    transform: 'scale(1.2)'
-                  }}
-                ></div>
-              </div>
+                Open Chest
+              </button>
             </div>
           </div>
         </div>
@@ -289,8 +399,28 @@ export default function NFT() {
         
         @media (max-width: 768px) {
           .chest-container {
-            width: 200px !important;
-            height: 150px !important;
+            width: 240px !important;
+            height: 180px !important;
+          }
+          
+          .chest-container img {
+            width: 144px !important;
+            height: 108px !important;
+          }
+          
+          .collections-grid {
+            grid-template-columns: repeat(3, 1fr) !important;
+          }
+          
+          .nft-card {
+            transform: scale(0.8) !important;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .chest-container {
+            width: 192px !important;
+            height: 144px !important;
           }
           
           .chest-container img {
@@ -299,23 +429,11 @@ export default function NFT() {
           }
           
           .collections-grid {
-            grid-template-columns: repeat(3, 1fr) !important;
-          }
-        }
-        
-        @media (max-width: 480px) {
-          .chest-container {
-            width: 160px !important;
-            height: 120px !important;
-          }
-          
-          .chest-container img {
-            width: 100px !important;
-            height: 75px !important;
-          }
-          
-          .collections-grid {
             grid-template-columns: repeat(2, 1fr) !important;
+          }
+          
+          .nft-card {
+            transform: scale(0.7) !important;
           }
         }
       `}</style>
