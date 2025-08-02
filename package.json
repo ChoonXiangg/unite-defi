@@ -6,7 +6,16 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "hardhat:node": "hardhat node",
+    "hardhat:compile": "hardhat compile",
+    "hardhat:test": "hardhat test",
+    "deploy:local": "hardhat run hardhat-deployment-scripts/deploy-pgs-token.js --network hardhat",
+    "deploy:sepolia": "hardhat run hardhat-deployment-scripts/deploy-pgs-token.js --network sepolia",  
+    "deploy:arbitrumSepolia": "hardhat run hardhat-deployment-scripts/deploy-pgs-token.js --network arbitrumSepolia",
+    "deploy:mainnet": "hardhat run hardhat-deployment-scripts/deploy-pgs-token.js --network mainnet",
+    "verify:sepolia": "hardhat verify --network sepolia",
+    "verify:mainnet": "hardhat verify --network mainnet"
   },
   "dependencies": {
     "@1inch/fusion-sdk": "^2.3.5",
@@ -29,6 +38,7 @@
     "@eslint/eslintrc": "^3",
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@tailwindcss/postcss": "^4",
+    "dotenv": "^17.2.1",
     "eslint": "^9",
     "eslint-config-next": "15.4.4",
     "hardhat": "^2.26.1",

@@ -47,6 +47,9 @@ export default function Main() {
   const [swapping, setSwapping] = useState(false);
   const [swapStatus, setSwapStatus] = useState(null);
 
+  // Equipped Pegasus state
+  const [equippedPegasus, setEquippedPegasus] = useState(null);
+
   // Backend-supported tokens with CoinGecko logos
   const tokens = [
     { 
@@ -530,6 +533,16 @@ export default function Main() {
     fetchPrices(tokenSymbols);
     fetchGasData();
     
+    // Load equipped Pegasus from localStorage
+    const loadEquippedPegasus = () => {
+      const equippedStored = localStorage.getItem('equippedPegasus');
+      if (equippedStored) {
+        setEquippedPegasus(equippedStored);
+      }
+    };
+    
+    loadEquippedPegasus();
+    
     // Check if wallet is already connected
     const checkWalletConnection = async () => {
       if (window.ethereum && window.ethereum.selectedAddress) {
@@ -987,7 +1000,7 @@ export default function Main() {
           {/* Right Side - Picture - More to the right */}
           <div className="flex items-center justify-start ml-20">
             <img 
-              src="/pegasus.svg" 
+              src={equippedPegasus ? `/pegasus/${equippedPegasus}` : "/pegasus.svg"} 
               alt="PegaSwap" 
               className="h-[720px] w-auto object-contain"
             />

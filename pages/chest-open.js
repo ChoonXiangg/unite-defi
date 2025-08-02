@@ -61,6 +61,17 @@ export default function ChestOpen() {
     'water wing.svg'
   ];
 
+  // TEST-MODE: seed drawnNFTs so only rainbow parts remain
+  useEffect(() => {
+    if (!localStorage.getItem('initialPresetComplete')) return;
+    const drawn = JSON.parse(localStorage.getItem('drawnNFTs') || '[]');
+    if (drawn.length === 0) {
+      // mark all non-rainbow parts as already drawn
+      const defaultDrawn = drawableNFTs.filter(nft => !nft.startsWith('rainbow '));
+      localStorage.setItem('drawnNFTs', JSON.stringify(defaultDrawn));
+    }
+  }, []);
+
   const drawRandomNFT = () => {
     // Get drawn NFTs from localStorage
     const drawnNFTsStored = JSON.parse(localStorage.getItem('drawnNFTs') || '[]');
@@ -85,22 +96,29 @@ export default function ChestOpen() {
   };
 
   const handleChestClick = () => {
-    if (!isChestOpen) {
-      // Opening chest - draw an NFT
-      const newNFT = drawRandomNFT();
-      if (newNFT) {
-        setDrawnNFT(newNFT);
-        setIsChestOpen(true);
-        
-        // Show NFT card after chest opens
-        setTimeout(() => {
-          setShowNFTCard(true);
-        }, 500);
-      } else {
-        // All NFTs have been collected
-        alert('🎉 Congratulations! You have collected everything in the collection! All NFTs have been unlocked!');
-      }
+    if (isChestOpen) return;
+
+    // Opening chest - draw an NFT
+    const newNFT = drawRandomNFT();
+    if (!newNFT) {
+      alert('🎉 Congratulations! You have collected everything in the collection! All NFTs have been unlocked!');
+      return;
     }
+
+    // immediately add to owned + check unlock
+    const existing = JSON.parse(localStorage.getItem('ownedNFTs') || '[]');
+    const updated = [...existing, newNFT];
+    localStorage.setItem('ownedNFTs', JSON.stringify(updated));
+
+    // if this draw completes the rainbow set, go straight to unlock page
+    if (checkForPegasusUnlocks(updated)) {
+      return;
+    }
+
+    // otherwise show chest + NFT card as before
+    setDrawnNFT(newNFT);
+    setIsChestOpen(true);
+    setTimeout(() => setShowNFTCard(true), 500);
   };
 
   // Pegasus unlock detection

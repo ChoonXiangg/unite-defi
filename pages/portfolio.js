@@ -116,6 +116,12 @@ export default function Portfolio() {
     setPortfolio(sortedPortfolio);
     setSelectedToken(sortedPortfolio[0]);
     
+    // Store PGS balance in localStorage for nft.js to access
+    const pgsToken = mockPortfolioData.find(token => token.symbol === 'PGS');
+    if (pgsToken) {
+      localStorage.setItem('pgsBalance', pgsToken.balance);
+    }
+    
     // Check if wallet is already connected
     const checkWalletConnection = async () => {
       if (window.ethereum && window.ethereum.selectedAddress) {
