@@ -365,7 +365,7 @@ export default function NFT() {
                 onClick={handleOpenChest}
                 className="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-600 hover:from-yellow-500 hover:via-orange-600 hover:to-red-700 text-white font-bold py-4 px-8 rounded-xl text-lg font-supercell transition-all duration-300 transform hover:scale-105 shadow-lg"
               >
-                Open Chest
+                5 PGS
               </button>
             </div>
           </div>
