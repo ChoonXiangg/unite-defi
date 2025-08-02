@@ -47,16 +47,6 @@ const mockPortfolioData = [
     priceHistory: [2380, 2410, 2390, 2420, 2450, 2480, 2450, 2470, 2450]
   },
   {
-    symbol: "BTC",
-    name: "Bitcoin",
-    balance: "0.08",
-    value: 3600.00,
-    price: 45000.00,
-    change24h: -2.1,
-    logo: "https://assets.coingecko.com/coins/images/1/small/bitcoin.png",
-    priceHistory: [44500, 45200, 44800, 45500, 45000, 46000, 45200, 44800, 45000]
-  },
-  {
     symbol: "USDC",
     name: "USD Coin",
     balance: "1500.00", 
@@ -67,14 +57,14 @@ const mockPortfolioData = [
     priceHistory: [0.999, 1.000, 0.998, 1.001, 1.000, 0.999, 1.000, 1.001, 1.000]
   },
   {
-    symbol: "XRP",
-    name: "XRP",
-    balance: "2000.00",
-    value: 1200.00,
-    price: 0.60,
-    change24h: -1.8,
-    logo: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png",
-    priceHistory: [0.62, 0.61, 0.58, 0.59, 0.60, 0.63, 0.61, 0.58, 0.60]
+    symbol: "XTZ",
+    name: "Tezos",
+    balance: "3500.00",
+    value: 4200.00,
+    price: 1.20,
+    change24h: 3.2,
+    logo: "https://assets.coingecko.com/coins/images/976/small/Tezos-logo.png",
+    priceHistory: [1.15, 1.18, 1.16, 1.19, 1.20, 1.22, 1.21, 1.18, 1.20]
   }
 ];
 
@@ -84,9 +74,9 @@ const getCoinGeckoId = (symbol) => {
   const coinGeckoMapping = {
     '1INCH': '1inch',
     'ETH': 'ethereum',
-    'BTC': 'bitcoin',
     'USDC': 'usd-coin',
-    'XRP': 'ripple'
+    'XTZ': 'tezos',
+    'PGS': 'ethereum' // PGS uses ethereum as fallback since it's custom token
   };
   
   return coinGeckoMapping[symbol?.toUpperCase()] || 'ethereum';
@@ -100,6 +90,12 @@ export default function Portfolio() {
   const [walletService] = useState(() => new WalletService());
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState(null);
+  
+  // Multi-chain portfolio states
+  const [multiChainData, setMultiChainData] = useState(null);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
+  const [portfolioError, setPortfolioError] = useState(null);
+  const [selectedChain, setSelectedChain] = useState(null);
 
   // Get real-time price for selected token
   const { 
@@ -110,18 +106,122 @@ export default function Portfolio() {
     isLive 
   } = useRealTimePrice(selectedToken?.symbol);
 
-  useEffect(() => {
-    // Sort by value and set highest as default
-    const sortedPortfolio = [...mockPortfolioData].sort((a, b) => b.value - a.value);
-    setPortfolio(sortedPortfolio);
-    setSelectedToken(sortedPortfolio[0]);
+  // Fetch multi-chain portfolio data
+  const fetchMultiChainPortfolio = async (address) => {
+    if (!address) return;
     
-    // Store PGS balance in localStorage for nft.js to access
-    const pgsToken = mockPortfolioData.find(token => token.symbol === 'PGS');
-    if (pgsToken) {
-      localStorage.setItem('pgsBalance', pgsToken.balance);
+    setPortfolioLoading(true);
+    setPortfolioError(null);
+    
+    try {
+      console.log('🔄 Fetching multi-chain portfolio for:', address);
+      const response = await fetch(`/api/portfolio/multi-chain?walletAddress=${address}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setMultiChainData(result.data);
+        
+        // Convert to portfolio format for compatibility
+        const allTokens = [];
+        
+        Object.values(result.data.chains).forEach(chain => {
+          if (chain.tokens && chain.tokens.length > 0) {
+            chain.tokens.forEach(token => {
+              if (token.metadata && token.numericBalance > 0) {
+                const tokenInfo = {
+                  symbol: token.metadata.symbol,
+                  name: token.metadata.name,
+                  balance: token.formattedBalance,
+                  value: token.estimatedValueUSD || 0,
+                  price: result.data.tokenLogos[token.metadata.symbol]?.currentPrice || 0,
+                  change24h: result.data.tokenLogos[token.metadata.symbol]?.priceChange24h || 0,
+                  logo: result.data.tokenLogos[token.metadata.symbol]?.logoUrl || token.metadata.logoURI || `https://via.placeholder.com/40x40/666666/ffffff?text=${token.metadata.symbol}`,
+                  chainId: token.chainId,
+                  chainName: token.chainName,
+                  address: token.address,
+                  decimals: token.metadata.decimals,
+                  isRealData: true
+                };
+                allTokens.push(tokenInfo);
+              }
+            });
+          }
+        });
+
+        // Add mock holdings for PGS, 1INCH, and Tezos if not found in real data
+        const foundSymbols = new Set(allTokens.map(token => token.symbol.toUpperCase()));
+        
+        const mockTokensToAdd = [
+          {
+            symbol: "PGS",
+            name: "PegaSwap",
+            balance: "2500.00",
+            value: 6750.00,
+            price: 2.70,
+            change24h: 8.5,
+            logo: "/PGS-logo-original.svg",
+            chainName: "Mock",
+            isRealData: false
+          },
+          {
+            symbol: "1INCH",
+            name: "1inch Network", 
+            balance: "15000.00",
+            value: 8750.00,
+            price: 0.583,
+            change24h: 12.4,
+            logo: "https://assets.coingecko.com/coins/images/13469/small/1inch-token.png",
+            chainName: "Mock",
+            isRealData: false
+          },
+          {
+            symbol: "XTZ",
+            name: "Tezos",
+            balance: "3500.00",
+            value: 4200.00,
+            price: 1.20,
+            change24h: 3.2,
+            logo: "https://assets.coingecko.com/coins/images/976/small/Tezos-logo.png",
+            chainName: "Mock",
+            isRealData: false
+          }
+        ];
+
+        // Add mock tokens if they weren't found in real wallet data
+        mockTokensToAdd.forEach(mockToken => {
+          if (!foundSymbols.has(mockToken.symbol)) {
+            allTokens.push(mockToken);
+            console.log(`📝 Added mock holding for ${mockToken.symbol}: ${mockToken.balance} (${mockToken.value} USD)`);
+          }
+        });
+        
+        // Sort by balance value and set as portfolio
+        const sortedTokens = allTokens.sort((a, b) => b.value - a.value);
+        setPortfolio(sortedTokens);
+        
+        if (sortedTokens.length > 0) {
+          setSelectedToken(sortedTokens[0]);
+        }
+        
+        console.log(`✅ Portfolio loaded: ${allTokens.length} tokens across ${result.data.summary.networksWithBalance} networks`);
+        
+      } else {
+        throw new Error(result.error || 'Failed to fetch portfolio');
+      }
+    } catch (error) {
+      console.error('❌ Failed to load multi-chain portfolio:', error);
+      setPortfolioError(error.message);
+      
+      // Fallback to mock data
+      const sortedPortfolio = [...mockPortfolioData].sort((a, b) => b.value - a.value);
+      setPortfolio(sortedPortfolio);
+      setSelectedToken(sortedPortfolio[0]);
+    } finally {
+      setPortfolioLoading(false);
     }
-    
+  };
+
+  useEffect(() => {
     // Check if wallet is already connected
     const checkWalletConnection = async () => {
       if (window.ethereum && window.ethereum.selectedAddress) {
@@ -129,9 +229,28 @@ export default function Portfolio() {
           const { address } = await walletService.connectWallet();
           setWalletConnected(true);
           setWalletAddress(address);
+          
+          // Fetch real portfolio data
+          await fetchMultiChainPortfolio(address);
+          
         } catch (error) {
           console.log('Wallet auto-connection failed:', error);
+          // Fallback to mock data
+          const sortedPortfolio = [...mockPortfolioData].sort((a, b) => b.value - a.value);
+          setPortfolio(sortedPortfolio);
+          setSelectedToken(sortedPortfolio[0]);
         }
+      } else {
+        // No wallet connected, use mock data
+        const sortedPortfolio = [...mockPortfolioData].sort((a, b) => b.value - a.value);
+        setPortfolio(sortedPortfolio);
+        setSelectedToken(sortedPortfolio[0]);
+      }
+      
+      // Store PGS balance in localStorage for nft.js to access
+      const pgsToken = mockPortfolioData.find(token => token.symbol === 'PGS');
+      if (pgsToken) {
+        localStorage.setItem('pgsBalance', pgsToken.balance);
       }
     };
     
@@ -274,6 +393,11 @@ export default function Portfolio() {
                         }`}>
                           {token.change24h >= 0 ? '+' : ''}{token.change24h}%
                         </span>
+                        {token.isRealData === false && (
+                          <span className="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400">
+                            Mock
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-gray-400">{token.name}</div>
                     </div>
@@ -394,6 +518,154 @@ export default function Portfolio() {
             )}
           </div>
         </div>
+
+        {/* Multi-Chain Portfolio Overview Section */}
+        {multiChainData && walletConnected && (
+          <div className="mt-8 bg-gray-800/90 rounded-2xl border border-gray-600/50 backdrop-blur-md shadow-xl p-6">
+            <h2 className="text-2xl font-bold text-white mb-6 font-supercell">🌐 Multi-Chain Portfolio Overview</h2>
+            
+            {/* Portfolio Loading State */}
+            {portfolioLoading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+                <span className="text-gray-300">Loading multi-chain portfolio...</span>
+              </div>
+            )}
+            
+            {/* Portfolio Error State */}
+            {portfolioError && (
+              <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4 mb-6">
+                <p className="text-red-400">❌ {portfolioError}</p>
+                <p className="text-red-300 text-sm mt-1">Showing mock data as fallback</p>
+              </div>
+            )}
+            
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="text-center p-4 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
+                <p className="text-2xl font-bold text-indigo-400">{multiChainData.summary.totalChains}</p>
+                <p className="text-sm text-indigo-300">Total Chains</p>
+              </div>
+              <div className="text-center p-4 bg-green-500/20 rounded-lg border border-green-500/30">
+                <p className="text-2xl font-bold text-green-400">{multiChainData.summary.networksWithBalance}</p>
+                <p className="text-sm text-green-300">Active Networks</p>
+              </div>
+              <div className="text-center p-4 bg-purple-500/20 rounded-lg border border-purple-500/30">
+                <p className="text-2xl font-bold text-purple-400">{multiChainData.summary.totalTokens}</p>
+                <p className="text-sm text-purple-300">Total Tokens</p>
+              </div>
+              <div className="text-center p-4 bg-orange-500/20 rounded-lg border border-orange-500/30">
+                <p className="text-2xl font-bold text-orange-400">{Object.keys(multiChainData.gasContext).length}</p>
+                <p className="text-sm text-orange-300">Gas Data</p>
+              </div>
+            </div>
+
+            {/* Chain Details */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-gray-300 mb-3 font-supercell">Chain Details:</h4>
+              {Object.entries(multiChainData.chains).map(([chainId, chainData]) => (
+                <div key={chainId} className="bg-gray-700/50 rounded-lg border border-gray-600/30">
+                  <div className="flex justify-between items-center p-4">
+                    <div>
+                      <span className="font-medium text-white font-supercell">{chainData.chainName}</span>
+                      <span className="text-sm text-gray-400 ml-2">({chainId})</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-indigo-400">{chainData.tokenCount || 0}</span>
+                      <span className="text-sm text-gray-400 ml-1">tokens</span>
+                      {chainData.gasInfo && (
+                        <div className="text-xs text-gray-500">
+                          Gas: {typeof chainData.gasInfo.standard === 'object' ? 
+                            (chainData.gasInfo.standard.maxFeePerGas || chainData.gasInfo.standard.gasPrice || 'N/A') : 
+                            chainData.gasInfo.standard} gwei
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Token Details */}
+                  {chainData.tokens && chainData.tokens.length > 0 && (
+                    <div className="px-4 pb-4">
+                      <div className="text-xs text-gray-400 mb-2">Tokens:</div>
+                      <div className="space-y-2">
+                        {chainData.tokens.slice(0, 10).map((token, idx) => (
+                          <div key={idx} className="flex justify-between items-center text-xs bg-gray-600/30 p-3 rounded border border-gray-600/20">
+                            <div className="flex items-center gap-3">
+                              {multiChainData.tokenLogos[token.metadata?.symbol] ? (
+                                <img 
+                                  src={multiChainData.tokenLogos[token.metadata.symbol].logoUrl}
+                                  alt={token.metadata?.symbol}
+                                  className="w-6 h-6 rounded-full"
+                                  onError={(e) => {
+                                    e.target.src = `https://via.placeholder.com/24x24/666666/ffffff?text=${token.metadata?.symbol}`;
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-6 h-6 rounded-full bg-gray-500 flex items-center justify-center text-xs text-white">
+                                  {token.metadata?.symbol?.charAt(0) || '?'}
+                                </div>
+                              )}
+                              <div>
+                                <span className="font-medium text-white">
+                                  {token.metadata?.symbol || `${token.address.slice(0, 6)}...`}
+                                </span>
+                                {token.metadata?.name && (
+                                  <span className="text-gray-400 ml-1">({token.metadata.name})</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="font-mono text-gray-300 text-right">
+                              <div>{token.formattedBalance}</div>
+                              {multiChainData.tokenLogos[token.metadata?.symbol]?.currentPrice && (
+                                <div className="text-xs text-gray-500">
+                                  ${multiChainData.tokenLogos[token.metadata?.symbol]?.currentPrice?.toFixed(4)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {chainData.tokens.length > 10 && (
+                          <div className="text-xs text-gray-500 text-center py-2">
+                            ... and {chainData.tokens.length - 10} more tokens
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 text-xs text-gray-500 text-center">
+              🔗 Powered by 1inch Balance API + Gas API + Token API + CoinGecko Logos
+            </div>
+          </div>
+        )}
+
+        {/* Connect Wallet Prompt */}
+        {!walletConnected && (
+          <div className="mt-8 bg-gray-800/90 rounded-2xl border border-gray-600/50 backdrop-blur-md shadow-xl p-8 text-center">
+            <h3 className="text-xl font-bold text-white mb-4 font-supercell">Connect Wallet for Real Portfolio Data</h3>
+            <p className="text-gray-400 mb-6">
+              Connect your wallet to see your actual multi-chain token holdings and balances
+            </p>
+            <button
+              onClick={async () => {
+                try {
+                  const { address } = await walletService.connectWallet();
+                  setWalletConnected(true);
+                  setWalletAddress(address);
+                  await fetchMultiChainPortfolio(address);
+                } catch (error) {
+                  console.error('Failed to connect wallet:', error);
+                }
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-8 rounded-lg transition-colors"
+            >
+              Connect Wallet
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

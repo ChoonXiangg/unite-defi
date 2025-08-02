@@ -1,3 +1,5 @@
+import { coinGeckoRateLimiter } from '../../../utils/rateLimiter';
+
 // Helper function to generate fallback chart data
 const generateFallbackData = (coinId, hours = 24) => {
   const basePrices = {
@@ -42,6 +44,9 @@ export default async function handler(req, res) {
   } = req.query;
 
   try {
+    // Wait for rate limiter slot before making API call
+    await coinGeckoRateLimiter.waitForSlot();
+    
     // CoinGecko API for historical price data
     const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=${vsCurrency}&days=${days}&interval=hourly`;
     

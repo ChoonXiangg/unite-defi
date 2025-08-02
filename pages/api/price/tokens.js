@@ -1,3 +1,5 @@
+import { coinGeckoRateLimiter } from '../../../utils/rateLimiter';
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -12,6 +14,8 @@ export default async function handler(req, res) {
   const tokenList = Array.isArray(tokens) ? tokens : tokens.split(',');
 
   try {
+    // Wait for rate limiter slot before making API call
+    await coinGeckoRateLimiter.waitForSlot();
     // Map token symbols to CoinGecko IDs
     const tokenMap = {
       'ETH': 'ethereum',
@@ -56,12 +60,20 @@ export default async function handler(req, res) {
       }
     }
 
+    // Include rate limit status in response
+    const rateLimitStatus = coinGeckoRateLimiter.getStatus();
+    
     res.status(200).json({
       success: true,
       prices,
       chainId: parseInt(chainId),
       timestamp: Date.now(),
-      source: 'coingecko'
+      source: 'coingecko',
+      rateLimit: {
+        remaining: rateLimitStatus.remainingCalls,
+        total: rateLimitStatus.maxCalls,
+        resetTime: rateLimitStatus.nextResetTime
+      }
     });
 
   } catch (error) {

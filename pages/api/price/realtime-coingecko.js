@@ -1,3 +1,5 @@
+import { coinGeckoRateLimiter } from '../../../utils/rateLimiter';
+
 // Helper function to get fallback prices by CoinGecko ID
 const getFallbackPrice = (coinId) => {
   const fallbackPrices = {
@@ -26,6 +28,9 @@ export default async function handler(req, res) {
   } = req.query;
 
   try {
+    // Wait for rate limiter slot before making API call
+    await coinGeckoRateLimiter.waitForSlot();
+    
     // CoinGecko Simple Price API
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`;
     

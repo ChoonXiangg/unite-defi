@@ -2,6 +2,7 @@ import Image from "next/image";
 import { Geist, Geist_Mono } from "next/font/google";
 import { useState, useEffect } from "react";
 import { WalletService, oneInchUtils } from "../utils/walletUtils";
+import { getTokenLogo, getChainLogo } from "../utils/tokenLogos";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,14 +51,14 @@ export default function Main() {
   // Equipped Pegasus state
   const [equippedPegasus, setEquippedPegasus] = useState(null);
 
-  // Backend-supported tokens with CoinGecko logos
+  // Backend-supported tokens with static logos
   const tokens = [
     { 
       symbol: "ETH", 
       name: "Ethereum", 
       chain: "Ethereum", 
       chainId: 1,
-      logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+      logo: getTokenLogo("ETH"),
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -65,7 +66,7 @@ export default function Main() {
       name: "Ethereum", 
       chain: "Arbitrum", 
       chainId: 42161,
-      logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+      logo: getTokenLogo("ETH"),
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -73,7 +74,7 @@ export default function Main() {
       name: "Ethereum", 
       chain: "Base", 
       chainId: 8453,
-      logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+      logo: getTokenLogo("ETH"),
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -81,7 +82,7 @@ export default function Main() {
       name: "USD Coin", 
       chain: "Ethereum", 
       chainId: 1,
-      logo: "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png",
+      logo: getTokenLogo("USDC"),
       address: "0xA0b86a33E6441b8C4C8C0C4C8C0C4C8C0C4C8C0C"
     },
     { 
@@ -89,7 +90,7 @@ export default function Main() {
       name: "USD Coin", 
       chain: "Arbitrum", 
       chainId: 42161,
-      logo: "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png",
+      logo: getTokenLogo("USDC"),
       address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
     },
     { 
@@ -97,7 +98,7 @@ export default function Main() {
       name: "USD Coin", 
       chain: "Polygon", 
       chainId: 137,
-      logo: "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png",
+      logo: getTokenLogo("USDC"),
       address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
     },
     { 
@@ -105,7 +106,7 @@ export default function Main() {
       name: "Tether USD", 
       chain: "Ethereum", 
       chainId: 1,
-      logo: "https://assets.coingecko.com/coins/images/325/small/Tether.png",
+      logo: getTokenLogo("USDT"),
       address: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
     },
     { 
@@ -113,7 +114,7 @@ export default function Main() {
       name: "BNB", 
       chain: "BSC", 
       chainId: 56,
-      logo: "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png",
+      logo: getTokenLogo("BNB"),
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -121,7 +122,7 @@ export default function Main() {
       name: "Polygon", 
       chain: "Polygon", 
       chainId: 137,
-      logo: "https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png",
+      logo: getTokenLogo("MATIC"),
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -129,7 +130,7 @@ export default function Main() {
       name: "Avalanche", 
       chain: "Avalanche", 
       chainId: 43114,
-      logo: "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png",
+      logo: getTokenLogo("AVAX"),
       address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
     },
     { 
@@ -137,7 +138,7 @@ export default function Main() {
       name: "Tezos", 
       chain: "Tezos", 
       chainId: null,
-      logo: "https://assets.coingecko.com/coins/images/976/small/Tezos-logo.png",
+      logo: getTokenLogo("XTZ"),
       address: "native"
     },
     { 
@@ -145,7 +146,7 @@ export default function Main() {
       name: "Kolibri USD", 
       chain: "Tezos", 
       chainId: null,
-      logo: "https://assets.coingecko.com/coins/images/14441/small/kolibri-logo.png",
+      logo: getTokenLogo("kUSD"),
       address: "KT1K9gCRgaLRFKTErYt1wVxA3Frb9FjasjTV"
     }
   ];
@@ -154,54 +155,55 @@ export default function Main() {
     { 
       name: "Ethereum", 
       chainId: 1, 
-      logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+      logo: getChainLogo("Ethereum"),
       rpc: "https://eth.llamarpc.com"
     },
     { 
       name: "Arbitrum", 
       chainId: 42161, 
-      logo: "https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg",
+      logo: getChainLogo("Arbitrum"),
       rpc: "https://arb1.arbitrum.io/rpc"
     },
     { 
       name: "Base", 
       chainId: 8453, 
-      logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+      logo: getChainLogo("Base"),
       rpc: "https://mainnet.base.org"
     },
     { 
       name: "Polygon", 
       chainId: 137, 
-      logo: "https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png",
+      logo: getChainLogo("Polygon"),
       rpc: "https://polygon-rpc.com"
     },
     { 
       name: "BSC", 
       chainId: 56, 
-      logo: "https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png",
+      logo: getChainLogo("BSC"),
       rpc: "https://bsc-dataseed1.binance.org"
     },
     { 
       name: "Avalanche", 
       chainId: 43114, 
-      logo: "https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png",
+      logo: getChainLogo("Avalanche"),
       rpc: "https://api.avax.network/ext/bc/C/rpc"
     },
     { 
       name: "Tezos", 
       chainId: null, 
-      logo: "https://assets.coingecko.com/coins/images/976/small/Tezos-logo.png",
+      logo: getChainLogo("Tezos"),
       rpc: "https://mainnet.api.tez.ie"
     }
   ];
 
-  // Fetch real-time prices from API
+  // Fetch real-time prices from 1inch API
   const fetchPrices = async (tokenList) => {
     try {
-      const response = await fetch(`/api/price/tokens?tokens=${tokenList.join(',')}&chainId=1`);
+      const response = await fetch(`/api/price/oneinch-prices?tokens=${tokenList.join(',')}&chainId=1`);
       const data = await response.json();
       if (data.success) {
         setPrices(data.prices);
+        console.log(`Prices updated from ${data.source} at ${new Date().toLocaleTimeString()}`);
       }
     } catch (error) {
       console.error('Failed to fetch prices:', error);
@@ -433,15 +435,15 @@ export default function Main() {
     return fallbackRates[tokenSymbol.toUpperCase()] || 1;
   };
 
-  const getTokenLogo = (symbol, chain = null) => {
+  const getTokenLogoFromTokens = (symbol, chain = null) => {
     const token = tokens.find(token => 
       token.symbol === symbol && (chain ? token.chain === chain : true)
     );
-    return token?.logo || "https://via.placeholder.com/32x32/666666/ffffff?text=" + symbol;
+    return token?.logo || getTokenLogo(symbol);
   };
 
-  const getChainLogo = (chainName) => {
-    return chains.find(chain => chain.name === chainName)?.logo || "https://via.placeholder.com/20x20/666666/ffffff?text=?";
+  const getChainLogoFromChains = (chainName) => {
+    return chains.find(chain => chain.name === chainName)?.logo || getChainLogo(chainName);
   };
 
   const getTokenChain = (symbol) => {
@@ -558,14 +560,14 @@ export default function Main() {
     
     checkWalletConnection();
     
-    // Refresh prices every 30 seconds and gas data every 60 seconds
+    // Refresh prices every 2 minutes and gas data every 5 minutes to respect rate limits
     const priceInterval = setInterval(() => {
       fetchPrices(tokenSymbols);
-    }, 30000);
+    }, 120000); // 2 minutes
     
     const gasInterval = setInterval(() => {
       fetchGasData();
-    }, 60000);
+    }, 300000); // 5 minutes
     
     return () => {
       clearInterval(priceInterval);
@@ -685,7 +687,7 @@ export default function Main() {
                       >
                         <div className="relative">
                           <img 
-                            src={getTokenLogo(fromToken, getTokenChain(fromToken))} 
+                            src={getTokenLogoFromTokens(fromToken, getTokenChain(fromToken))} 
                             alt={fromToken}
                             className="w-10 h-10 rounded-full"
                             onError={(e) => {
@@ -694,7 +696,7 @@ export default function Main() {
                           />
                           <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${getChainColor(getTokenChain(fromToken))} border-2 border-gray-800 flex items-center justify-center`}>
                             <img 
-                              src={getChainLogo(getTokenChain(fromToken))} 
+                              src={getChainLogoFromChains(getTokenChain(fromToken))} 
                               alt={getTokenChain(fromToken)}
                               className="w-3 h-3 rounded-full"
                               onError={(e) => {
@@ -742,7 +744,7 @@ export default function Main() {
                                   />
                                   <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${getChainColor(token.chain)} border-2 border-gray-800 flex items-center justify-center`}>
                                     <img 
-                                      src={getChainLogo(token.chain)} 
+                                      src={getChainLogoFromChains(token.chain)} 
                                       alt={token.chain}
                                       className="w-3 h-3 rounded-full"
                                       onError={(e) => {
@@ -826,7 +828,7 @@ export default function Main() {
                           <>
                             <div className="relative">
                               <img 
-                                src={getTokenLogo(toToken, getTokenChain(toToken))} 
+                                src={getTokenLogoFromTokens(toToken, getTokenChain(toToken))} 
                                 alt={toToken}
                                 className="w-10 h-10 rounded-full"
                                 onError={(e) => {
@@ -835,7 +837,7 @@ export default function Main() {
                               />
                               <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full ${getChainColor(getTokenChain(toToken))} border-2 border-gray-800 flex items-center justify-center`}>
                                 <img 
-                                  src={getChainLogo(getTokenChain(toToken))} 
+                                  src={getChainLogoFromChains(getTokenChain(toToken))} 
                                   alt={getTokenChain(toToken)}
                                   className="w-3 h-3 rounded-full"
                                   onError={(e) => {
@@ -887,7 +889,7 @@ export default function Main() {
                                   />
                                   <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${getChainColor(token.chain)} border-2 border-gray-800 flex items-center justify-center`}>
                                     <img 
-                                      src={getChainLogo(token.chain)} 
+                                      src={getChainLogoFromChains(token.chain)} 
                                       alt={token.chain}
                                       className="w-3 h-3 rounded-full"
                                       onError={(e) => {
