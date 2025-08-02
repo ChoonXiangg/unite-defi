@@ -1007,22 +1007,53 @@ export default function TokenTest() {
                   <div className="space-y-3">
                     <h4 className="font-semibold text-gray-700 mb-3">Chain Details:</h4>
                     {Object.entries(oneInchPortfolio.chains).map(([chainId, chainData]) => (
-                      <div key={chainId} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <span className="font-medium">{chainData.chainName}</span>
-                          <span className="text-sm text-gray-500 ml-2">({chainId})</span>
+                      <div key={chainId} className="bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-center p-3">
+                          <div>
+                            <span className="font-medium">{chainData.chainName}</span>
+                            <span className="text-sm text-gray-500 ml-2">({chainId})</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-bold text-indigo-600">{chainData.tokenCount || 0}</span>
+                            <span className="text-sm text-gray-500 ml-1">tokens</span>
+                            {chainData.gasInfo && (
+                              <div className="text-xs text-gray-400">
+                                Gas: {typeof chainData.gasInfo.standard === 'object' ? 
+                                  (chainData.gasInfo.standard.maxFeePerGas || chainData.gasInfo.standard.gasPrice || 'N/A') : 
+                                  chainData.gasInfo.standard} gwei
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="font-bold text-indigo-600">{chainData.tokenCount || 0}</span>
-                          <span className="text-sm text-gray-500 ml-1">tokens</span>
-                          {chainData.gasInfo && (
-                            <div className="text-xs text-gray-400">
-                              Gas: {typeof chainData.gasInfo.standard === 'object' ? 
-                                (chainData.gasInfo.standard.maxFeePerGas || chainData.gasInfo.standard.gasPrice || 'N/A') : 
-                                chainData.gasInfo.standard} gwei
+                        
+                        {/* Token Details */}
+                        {chainData.tokens && chainData.tokens.length > 0 && (
+                          <div className="px-3 pb-3">
+                            <div className="text-xs text-gray-600 mb-2">Tokens:</div>
+                            <div className="space-y-1">
+                              {chainData.tokens.slice(0, 5).map((token, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded">
+                                  <div>
+                                    <span className="font-medium">
+                                      {token.metadata?.symbol || `${token.address.slice(0, 6)}...`}
+                                    </span>
+                                    {token.metadata?.name && (
+                                      <span className="text-gray-500 ml-1">({token.metadata.name})</span>
+                                    )}
+                                  </div>
+                                  <div className="font-mono text-gray-700">
+                                    {token.formattedBalance}
+                                  </div>
+                                </div>
+                              ))}
+                              {chainData.tokens.length > 5 && (
+                                <div className="text-xs text-gray-500 text-center py-1">
+                                  ... and {chainData.tokens.length - 5} more tokens
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -1,6 +1,10 @@
 // Enhanced portfolio API using comprehensive 1inch API integration
 // This endpoint provides detailed portfolio information without adding new functionality
 
+// Utility function to throttle requests (10 req/sec = 100ms between requests)
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const THROTTLE_DELAY = 120; // 120ms = ~8 req/sec to be safe
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -50,22 +54,31 @@ export default async function handler(req, res) {
       }
     };
 
-    // 🆕 Get gas prices for all supported chains in parallel
-    console.log('💰 Fetching gas prices for all chains...');
-    const gasPromises = supportedChains.map(async (chain) => {
+    // 🆕 Get gas prices for all supported chains sequentially to respect rate limits
+    console.log('💰 Fetching gas prices for all chains (throttled)...');
+    const gasResults = [];
+    
+    for (const chain of supportedChains) {
       try {
+        console.log(`   Fetching gas for ${chain.name}...`);
         const gasResponse = await fetch(`https://api.1inch.dev/gas-price/v1.5/${chain.id}`, { headers });
         if (gasResponse.ok) {
           const gasData = await gasResponse.json();
-          return { chainId: chain.id, chainName: chain.name, gasData };
+          gasResults.push({ status: 'fulfilled', value: { chainId: chain.id, chainName: chain.name, gasData } });
+        } else {
+          console.warn(`Gas API failed for ${chain.name}: ${gasResponse.status}`);
+          gasResults.push({ status: 'rejected', reason: `HTTP ${gasResponse.status}` });
         }
       } catch (error) {
         console.warn(`Gas API failed for ${chain.name}:`, error.message);
+        gasResults.push({ status: 'rejected', reason: error.message });
       }
-      return null;
-    });
-
-    const gasResults = await Promise.allSettled(gasPromises);
+      
+      // Throttle requests to stay under 10 req/sec
+      if (chain !== supportedChains[supportedChains.length - 1]) {
+        await sleep(THROTTLE_DELAY);
+      }
+    }
     gasResults.forEach(result => {
       if (result.status === 'fulfilled' && result.value) {
         // Normalize gas data to prevent React rendering errors
@@ -91,11 +104,16 @@ export default async function handler(req, res) {
       }
     });
 
-    // 🆕 Enhanced balance checking with token metadata for each chain
-    console.log('🔍 Fetching enhanced balance data for all chains...');
-    for (const chain of supportedChains) {
+    // 🆕 Enhanced balance checking with token metadata for each chain (throttled)
+    console.log('🔍 Fetching enhanced balance data for all chains (throttled)...');
+    for (const [index, chain] of supportedChains.entries()) {
       try {
         console.log(`   Checking ${chain.name} (${chain.id})...`);
+
+        // Add throttle delay before each balance request (except first)
+        if (index > 0) {
+          await sleep(THROTTLE_DELAY);
+        }
 
         // Get balances using 1inch Balance API
         const balanceResponse = await fetch(
@@ -109,43 +127,87 @@ export default async function handler(req, res) {
           
           if (tokenCount > 0) {
             console.log(`   ✅ Found ${tokenCount} tokens on ${chain.name}`);
-            portfolioData.summary.networksWithBalance++;
+            console.log(`   📊 Sample tokens:`, Object.keys(balanceData).slice(0, 3));
+            console.log(`   📊 Sample balances:`, Object.values(balanceData).slice(0, 3));
+            
+            // Check if any balances are actually non-zero
+            const nonZeroBalances = Object.values(balanceData).filter(balance => balance && balance !== '0');
+            console.log(`   📊 Non-zero balances: ${nonZeroBalances.length}/${tokenCount}`);
+            
+            if (nonZeroBalances.length > 0) {
+              console.log(`   📊 Sample non-zero balances:`, nonZeroBalances.slice(0, 3));
+              portfolioData.summary.networksWithBalance++;
+            } else {
+              console.log(`   ⚠️ All balances are zero on ${chain.name}`);
+            }
 
-            // 🆕 Get token metadata for each token using 1inch Token API
-            const tokenAddresses = Object.keys(balanceData).slice(0, 20); // Limit to prevent API overload
-            const tokenMetadataPromises = tokenAddresses.map(async (tokenAddress) => {
+            // Only process metadata for chains with actual token balances
+            if (nonZeroBalances.length > 0) {
+              // 🆕 Get token metadata for tokens with non-zero balances (throttled)
+              const nonZeroTokens = Object.entries(balanceData)
+                .filter(([addr, balance]) => balance && balance !== '0')
+                .slice(0, 10); // Limit to 10 most important tokens
+              
+              console.log(`   📊 Getting metadata for ${nonZeroTokens.length} tokens with balances...`);
+              const tokenMetadataResults = [];
+            
+            for (const [tokenAddress, balance] of nonZeroTokens) {
               try {
+                await sleep(THROTTLE_DELAY); // Throttle each metadata request
                 const tokenResponse = await fetch(
                   `https://api.1inch.dev/token/v1.2/${chain.id}/custom?addresses=${tokenAddress}`,
                   { headers }
                 );
                 if (tokenResponse.ok) {
                   const tokenData = await tokenResponse.json();
-                  return { address: tokenAddress, metadata: tokenData[tokenAddress.toLowerCase()] };
+                  tokenMetadataResults.push({ 
+                    status: 'fulfilled', 
+                    value: { address: tokenAddress, metadata: tokenData[tokenAddress.toLowerCase()] }
+                  });
+                } else {
+                  console.warn(`Token metadata failed for ${tokenAddress}: ${tokenResponse.status}`);
+                  tokenMetadataResults.push({ 
+                    status: 'fulfilled', 
+                    value: { address: tokenAddress, metadata: null }
+                  });
                 }
               } catch (error) {
                 console.warn(`Token metadata failed for ${tokenAddress}:`, error.message);
+                tokenMetadataResults.push({ 
+                  status: 'fulfilled', 
+                  value: { address: tokenAddress, metadata: null }
+                });
               }
-              return { address: tokenAddress, metadata: null };
-            });
-
-            const tokenMetadataResults = await Promise.allSettled(tokenMetadataPromises);
+            }
             
-            // Build enhanced token list
-            const enhancedTokens = Object.entries(balanceData).map(([tokenAddress, balance]) => {
+            // Build enhanced token list (focus on tokens with non-zero balances)
+            const enhancedTokens = nonZeroTokens.map(([tokenAddress, balance]) => {
               const metadataResult = tokenMetadataResults.find(
                 result => result.status === 'fulfilled' && result.value.address === tokenAddress
               );
               
               const metadata = metadataResult?.value?.metadata || null;
               
+              // Calculate formatted balance
+              let formattedBalance = '0';
+              let numericBalance = 0;
+              
+              if (balance && balance !== '0') {
+                if (metadata?.decimals) {
+                  numericBalance = parseFloat(balance) / Math.pow(10, metadata.decimals);
+                  formattedBalance = numericBalance.toFixed(6);
+                } else {
+                  // If no decimals info, try to display raw balance
+                  numericBalance = parseFloat(balance);
+                  formattedBalance = numericBalance > 0 ? balance : '0';
+                }
+              }
+              
               return {
                 address: tokenAddress,
                 balance: balance,
-                formattedBalance: balance !== '0' ? 
-                  (metadata?.decimals ? 
-                    (parseFloat(balance) / Math.pow(10, metadata.decimals)).toFixed(6) : 
-                    'Unknown') : '0',
+                formattedBalance: formattedBalance,
+                numericBalance: numericBalance,
                 metadata: metadata ? {
                   name: metadata.name,
                   symbol: metadata.symbol,
@@ -154,17 +216,37 @@ export default async function handler(req, res) {
                 } : null,
                 source: '1inch_enhanced_api'
               };
-            }).filter(token => token.balance !== '0');
+            }); // No additional filtering needed since we already selected non-zero tokens
 
-            portfolioData.chains[chain.id] = {
-              chainName: chain.name,
-              tokenCount: enhancedTokens.length,
-              tokens: enhancedTokens,
-              gasInfo: portfolioData.gasContext[chain.id] || null,
-              lastUpdated: new Date().toISOString()
-            };
+            console.log(`   📋 Final enhanced tokens count: ${enhancedTokens.length}`);
+            if (enhancedTokens.length > 0) {
+              console.log(`   📋 Sample enhanced tokens:`, enhancedTokens.slice(0, 2).map(t => ({
+                symbol: t.metadata?.symbol,
+                formatted: t.formattedBalance,
+                numeric: t.numericBalance
+              })));
+            }
 
-            portfolioData.summary.totalTokens += enhancedTokens.length;
+              portfolioData.chains[chain.id] = {
+                chainName: chain.name,
+                tokenCount: enhancedTokens.length,
+                tokens: enhancedTokens,
+                gasInfo: portfolioData.gasContext[chain.id] || null,
+                lastUpdated: new Date().toISOString()
+              };
+
+              portfolioData.summary.totalTokens += enhancedTokens.length;
+            } else {
+              // No tokens with balances, create empty chain entry
+              console.log(`   📋 No tokens with balances on ${chain.name}`);
+              portfolioData.chains[chain.id] = {
+                chainName: chain.name,
+                tokenCount: 0,
+                tokens: [],
+                gasInfo: portfolioData.gasContext[chain.id] || null,
+                lastUpdated: new Date().toISOString()
+              };
+            }
           } else {
             console.log(`   ⚪ No tokens found on ${chain.name}`);
             portfolioData.chains[chain.id] = {
