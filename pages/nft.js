@@ -306,6 +306,30 @@ export default function NFT() {
         background: 'radial-gradient(ellipse at center, #6f42c1, #5c4ba0, #58c0e0)'
       }}
     >
+      {/* Reset Memory (preserves preset and resets PGS to 2500) */}
+      <button
+        onClick={() => {
+          const defaultOwned = allNFTs.filter(n => !n.startsWith('rainbow '));
+          localStorage.setItem('ownedNFTs', JSON.stringify(defaultOwned));
+
+          const defaultUnlocked = defaultOwned.filter(n => n.includes('pegasus.svg'));
+          localStorage.setItem('unlockedPegasus', JSON.stringify(defaultUnlocked));
+
+          const defaultDrawn = drawableNFTs.filter(n => !n.startsWith('rainbow '));
+          localStorage.setItem('drawnNFTs', JSON.stringify(defaultDrawn));
+
+          // **Reset PGS to 2500**  
+          localStorage.setItem('pgsBalance', '2500');
+
+          // preserve the preset flag  
+          localStorage.setItem('initialPresetComplete', 'true');
+
+          window.location.reload();
+        }}
+        className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded z-[60]"
+      >
+        Reset Memory
+      </button>
       
       {/* Navbar with same styling as other pages */}
       <nav className="bg-gray-800/90 backdrop-blur-md border-b border-gray-600/50 sticky top-0 z-50 shadow-xl">
