@@ -53,67 +53,18 @@ export default function PegasusUnlock() {
         </h2>
       </div>
 
-      {/* NFT Card with Golden Light */}
+      {/* NFT Card with Soft Glow */}
       <div className="flex items-center justify-center h-screen pt-16 pb-12">
-        <div className="relative overflow-hidden">
-          {/* Legendary Aura Effect - Behind Card */}
-          <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-            
-            {/* Core Golden Aura */}
-            <div 
-              className={`absolute top-1/2 left-1/2 w-80 h-80 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-2000 delay-500 ${
-                showAnimation ? 'opacity-100' : 'opacity-0'
-              }`}
-              style={{
-                background: 'radial-gradient(ellipse, rgba(255, 215, 0, 0.4) 0%, rgba(255, 193, 7, 0.3) 30%, rgba(255, 235, 59, 0.2) 60%, transparent 100%)',
-                filter: 'blur(30px)',
-                animation: showAnimation ? 'auralPulse 4s ease-in-out infinite' : 'none'
-              }}
-            ></div>
-
-            {/* Fluid Ripple Layer */}
-            <div 
-              className={`absolute top-1/2 left-1/2 w-96 h-96 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-2000 delay-700 ${
-                showAnimation ? 'opacity-100' : 'opacity-0'
-              }`}
-              style={{
-                background: 'radial-gradient(circle, rgba(255, 223, 0, 0.25) 0%, rgba(255, 193, 7, 0.15) 40%, rgba(255, 248, 225, 0.1) 70%, transparent 100%)',
-                filter: 'blur(40px)',
-                animation: showAnimation ? 'fluidRipple 6s ease-in-out infinite' : 'none'
-              }}
-            ></div>
-
-            {/* Airy Sparkle Layer */}
-            <div 
-              className={`absolute top-1/2 left-1/2 w-72 h-72 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-2000 delay-900 ${
-                showAnimation ? 'opacity-100' : 'opacity-0'
-              }`}
-              style={{
-                background: 'radial-gradient(ellipse 120% 80%, rgba(255, 248, 220, 0.3) 0%, rgba(255, 215, 0, 0.2) 50%, transparent 80%)',
-                filter: 'blur(20px)',
-                animation: showAnimation ? 'airyShimmer 8s ease-in-out infinite' : 'none'
-              }}
-            ></div>
-
-            {/* Outer Ethereal Glow */}
-            <div 
-              className={`absolute top-1/2 left-1/2 w-[28rem] h-[28rem] -translate-x-1/2 -translate-y-1/2 transition-opacity duration-2000 delay-600 ${
-                showAnimation ? 'opacity-100' : 'opacity-0'
-              }`}
-              style={{
-                background: 'radial-gradient(circle, rgba(255, 215, 0, 0.15) 0%, rgba(255, 204, 0, 0.08) 30%, rgba(255, 235, 59, 0.05) 60%, transparent 100%)',
-                filter: 'blur(50px)',
-                animation: showAnimation ? 'etherealBreath 10s ease-in-out infinite' : 'none'
-              }}
-            ></div>
-
-          </div>
+        <div className="relative overflow-visible">
+          {/* Soft Glow */}
+          <div className="soft-glow" />
 
           {/* NFT Card */}
-          <div 
-            className={`nft-card bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600 p-2 rounded-3xl shadow-2xl relative z-10 transition-all duration-1000 ease-out delay-200 ${
-              showAnimation ? 'opacity-100' : 'opacity-0'
-            }`}
+          <div
+            className={`nft-card bg-gradient-to-br from-yellow-400 via-orange-500 to-red-600
+                        p-2 rounded-3xl shadow-2xl relative z-10
+                        transition-opacity duration-1000 ease-out delay-200
+                        ${showAnimation ? 'opacity-100' : 'opacity-0'}`}
           >
             <div className="bg-gray-900 rounded-2xl p-5 w-[269px] h-[438px]">
               {/* Card Header */}
@@ -174,60 +125,38 @@ export default function PegasusUnlock() {
 
       {/* Custom CSS for animations */}
       <style jsx>{`
-        @keyframes auralPulse {
-          0%, 100% {
-            opacity: 0.4;
-            transform: translate(-50%, -50%) scale(1);
-          }
-          50% {
-            opacity: 0.7;
-            transform: translate(-50%, -50%) scale(1.1);
-          }
+        /* Soft, slow pulsing glow behind the card */
+        .soft-glow {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 320px;    /* slightly bigger than your 269px card */
+          height: 480px;   /* match card aspect ratio */
+          transform: translate(-50%, -50%);
+          background: radial-gradient(
+            circle,
+            rgba(255, 248, 220, 0.5) 0%,    /* pale white-gold center */
+            transparent 70%                 /* fade out softly */
+          );
+          filter: blur(40px);
+          z-index: 0;
+          pointer-events: none;
+          animation: glowPulse 6s ease-in-out infinite;
         }
 
-        @keyframes fluidRipple {
+        @keyframes glowPulse {
           0%, 100% {
-            opacity: 0.25;
-            transform: translate(-50%, -50%) scale(1) rotate(0deg);
-          }
-          33% {
-            opacity: 0.4;
-            transform: translate(-50%, -50%) scale(1.05) rotate(120deg);
-          }
-          66% {
-            opacity: 0.15;
-            transform: translate(-50%, -50%) scale(0.95) rotate(240deg);
-          }
-        }
-
-        @keyframes airyShimmer {
-          0%, 100% {
-            opacity: 0.3;
             transform: translate(-50%, -50%) scale(1);
-          }
-          25% {
-            opacity: 0.5;
-            transform: translate(-50%, -50%) scale(1.08);
+            opacity: 0.4;
           }
           50% {
-            opacity: 0.2;
-            transform: translate(-50%, -50%) scale(0.92);
-          }
-          75% {
-            opacity: 0.45;
             transform: translate(-50%, -50%) scale(1.05);
+            opacity: 0.6;
           }
         }
 
-        @keyframes etherealBreath {
-          0%, 100% {
-            opacity: 0.15;
-            transform: translate(-50%, -50%) scale(1);
-          }
-          50% {
-            opacity: 0.25;
-            transform: translate(-50%, -50%) scale(1.03);
-          }
+        .nft-card {
+          position: relative;
+          z-index: 1;
         }
       `}</style>
     </div>

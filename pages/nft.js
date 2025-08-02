@@ -114,10 +114,10 @@ export default function NFT() {
     // Get already unlocked pegasus from localStorage
     const unlockedPegasus = JSON.parse(localStorage.getItem('unlockedPegasus') || '[]');
     
-    pegasusTypes.forEach(pegasusType => {
+    for (const pegasusType of pegasusTypes) {
       // Skip if already unlocked
       if (unlockedPegasus.includes(`${pegasusType} pegasus.svg`)) {
-        return;
+        continue;
       }
       
       // Check if all parts are collected
@@ -143,8 +143,9 @@ export default function NFT() {
         setTimeout(() => {
           window.location.href = `/pegasus-unlock?pegasus=${pegasusType}`;
         }, 500);
+        return; // Exit the function after first unlock
       }
-    });
+    }
   };
 
   useEffect(() => {

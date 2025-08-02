@@ -111,10 +111,10 @@ export default function ChestOpen() {
     // Get already unlocked pegasus from localStorage
     const unlockedPegasus = JSON.parse(localStorage.getItem('unlockedPegasus') || '[]');
     
-    pegasusTypes.forEach(pegasusType => {
+    for (const pegasusType of pegasusTypes) {
       // Skip if already unlocked
       if (unlockedPegasus.includes(`${pegasusType} pegasus.svg`)) {
-        return;
+        continue;
       }
       
       // Check if all parts are collected
@@ -139,7 +139,7 @@ export default function ChestOpen() {
         router.push(`/pegasus-unlock?pegasus=${pegasusType}`);
         return true; // Indicate that unlock happened
       }
-    });
+    }
     
     return false; // No unlock happened
   };
