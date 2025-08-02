@@ -962,6 +962,10 @@ export default function Main() {
                     <span className="text-gray-400 font-supercell" style={{fontSize: '95%'}}>$PGS mint:</span>
                     <span className="text-white font-medium">20.999</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 font-supercell" style={{fontSize: '95%'}}>Rebate:</span>
+                    <span className="text-white font-medium">1%</span>
+                  </div>
                 </div>
               </div>
 
