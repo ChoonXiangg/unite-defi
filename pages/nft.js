@@ -22,6 +22,7 @@ export default function NFT() {
   const [ownedNFTs, setOwnedNFTs] = useState([]);
   const [expandedPegasus, setExpandedPegasus] = useState(null);
   const [equippedPegasus, setEquippedPegasus] = useState(null);
+  const [pgsBalance, setPgsBalance] = useState(0);
 
   // Drawable NFTs (excludes pegasus NFTs)
   const drawableNFTs = [
@@ -215,6 +216,12 @@ export default function NFT() {
         setEquippedPegasus(equippedStored);
       }
       
+      // Load PGS balance from localStorage
+      const storedBalance = localStorage.getItem('pgsBalance');
+      if (storedBalance) {
+        setPgsBalance(parseFloat(storedBalance));
+      }
+      
       // Check for pegasus unlocks
       checkForPegasusUnlocks(cleanedOwnedNFTs);
     };
@@ -224,6 +231,12 @@ export default function NFT() {
   }, [walletService]);
 
   const handleOpenChest = () => {
+    // Check if user has enough PGS
+    if (pgsBalance < 5) {
+      alert('Sorry, you don\'t have enough PGS to buy the chest');
+      return;
+    }
+
     // Check if all NFTs have been collected
     const drawnNFTsStored = JSON.parse(localStorage.getItem('drawnNFTs') || '[]');
     const availableNFTs = drawableNFTs.filter(nft => !drawnNFTsStored.includes(nft));
@@ -232,6 +245,11 @@ export default function NFT() {
       // All NFTs have been collected
       alert('🎉 Congratulations! You have collected everything in the collection! All NFTs have been unlocked!');
     } else {
+      // Deduct 5 PGS and update localStorage
+      const newBalance = pgsBalance - 5;
+      setPgsBalance(newBalance);
+      localStorage.setItem('pgsBalance', newBalance.toString());
+      
       // Still have NFTs to collect, go to chest page
       window.location.href = '/chest-open';
     }
@@ -490,11 +508,19 @@ export default function NFT() {
             {/* Equipped Pegasus Visual */}
             <div className="w-full max-w-md flex items-center justify-center mb-2">
               <div className="w-96 h-96">
-                <img
-                  src={equippedPegasus ? `/pegasus/${equippedPegasus}` : `/pegasus.svg`}
-                  alt="Equipped Pegasus"
-                  className="w-full h-full object-contain"
-                />
+                {equippedPegasus ? (
+                  <img
+                    src={`/pegasus/${equippedPegasus}`}
+                    alt="Equipped Pegasus"
+                    className="w-full h-full object-contain scale-110"
+                  />
+                ) : (
+                  <img
+                    src="/pegasus.svg"
+                    alt="Default Pegasus"
+                    className="w-full h-full object-contain scale-110"
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -513,6 +539,9 @@ export default function NFT() {
                 >
                   5 PGS
                 </button>
+                <p className="text-sm text-gray-300 mt-3 font-supercell">
+                  You have: {pgsBalance.toFixed(2)} PGS
+                </p>
               </div>
             </div>
           </div>
