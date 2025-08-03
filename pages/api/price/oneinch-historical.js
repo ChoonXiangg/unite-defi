@@ -15,7 +15,7 @@ const TOKEN_ADDRESSES = {
   },
   42161: {
     'ETH': '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-    'USDC': '0xFF970A61A04b1CdD3c43f5dE4533eBDDB5CC8',
+    'USDC': '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
     'USDT': '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
     'WETH': '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
     'PGS': '0x4a109A21EeD37d5D1AA0e8e2DE9e50005850eC6c'
@@ -101,6 +101,25 @@ function generateSimulatedChart(currentPrice, hours = 24, points = 48) {
   const prices = [];
   const now = new Date();
   
+  // Handle $0 price - return flat $0 chart
+  if (currentPrice === 0) {
+    for (let i = 0; i < points; i++) {
+      const hoursAgo = (hours * (points - 1 - i)) / (points - 1);
+      const timestamp = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+      
+      prices.push({
+        time: timestamp.toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false 
+        }),
+        timestamp: timestamp.getTime(),
+        price: 0
+      });
+    }
+    return prices;
+  }
+  
   // Create realistic price variations (±2-5% from current price)
   const baseVolatility = 0.02; // 2% base volatility
   const extraVolatility = Math.random() * 0.03; // Up to 3% extra
@@ -148,6 +167,10 @@ function calculate24hChange(chartData) {
   
   const oldestPrice = chartData[0].price;
   const currentPrice = chartData[chartData.length - 1].price;
+  
+  // Handle $0 prices
+  if (oldestPrice === 0 && currentPrice === 0) return 0;
+  if (oldestPrice === 0) return 0; // Prevent division by zero
   
   const change = ((currentPrice - oldestPrice) / oldestPrice) * 100;
   return parseFloat(change.toFixed(2));
@@ -205,8 +228,8 @@ export default async function handler(req, res) {
     if (upperSymbol === 'PGS') {
       console.log(`💡 Generating simulated data for PGS custom token...`);
       
-      // Generate simulated chart for PGS with $2.70 base price
-      const currentPrice = 2.70;
+      // Generate simulated chart for PGS with $0 base price
+      const currentPrice = 0;
       const hours = parseInt(days) * 24;
       const points = Math.min(hours * 2, 96);
       const chartData = generateSimulatedChart(currentPrice, hours, points);

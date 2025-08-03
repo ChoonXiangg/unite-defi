@@ -16,7 +16,7 @@ const TOKEN_ADDRESSES = {
   // Arbitrum (chainId: 42161)
   42161: {
     'ETH': '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-    'USDC': '0xFF970A61A04b1CdD3c43f5dE4533eBDDB5CC8',
+    'USDC': '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
     'USDT': '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
     'WETH': '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
     '1INCH': '0x8312e7d6EeACe1c09bbB8cfEb5ea7E47828283E3',
@@ -183,17 +183,17 @@ async function getRealTimePrice(tokenSymbol, chainId = null) {
   } catch (error) {
     console.error(`❌ Failed to fetch 1inch price for ${upperSymbol}:`, error.message);
     
-    // Special handling for PGS (custom token) - provide a reasonable price
+    // Special handling for PGS (custom token) - set price to 0
     if (upperSymbol === 'PGS') {
-      console.log(`💡 PGS is a custom token, providing estimated price since 1inch may not have liquidity`);
+      console.log(`💡 PGS is a custom token, setting price to $0`);
       return {
         success: true,
-        price: 2.70, // Estimated PGS price in USD
+        price: 0, // PGS price set to $0
         symbol: tokenSymbol.toUpperCase(),
         chainId: targetChainId,
         timestamp: Date.now(),
         usingFallback: true,
-        fallbackMessage: `PGS custom token price (1inch may not have liquidity)`,
+        fallbackMessage: `PGS custom token price set to $0`,
         source: 'custom-token',
         customToken: true
       };

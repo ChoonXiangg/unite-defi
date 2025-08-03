@@ -40,10 +40,6 @@ const getCoinGeckoId = (symbol) => {
 
 // Helper function to format USD values with appropriate decimal places
 const formatUSDValue = (value) => {
-  // Debug logging for troubleshooting
-  if (value > 0 && value < 1) {
-    console.log(`🔧 formatUSDValue DEBUG: input=${value}, type=${typeof value}`);
-  }
   
   if (value === 0) return '$0.00';
   
@@ -55,7 +51,6 @@ const formatUSDValue = (value) => {
       minimumFractionDigits: 4, 
       maximumFractionDigits: 6 
     });
-    console.log(`🔧 formatUSDValue DEBUG: small amount ${value} formatted as ${formatted}`);
     return formatted;
   }
   // For small amounts, show 3 decimal places
@@ -66,7 +61,6 @@ const formatUSDValue = (value) => {
       minimumFractionDigits: 3, 
       maximumFractionDigits: 3 
     });
-    console.log(`🔧 formatUSDValue DEBUG: medium amount ${value} formatted as ${formatted}`);
     return formatted;
   }
   // For normal amounts, show 2 decimal places
@@ -212,15 +206,9 @@ export default function Portfolio() {
                     }
                   }
                   
-                  const balance = parseFloat(token.formattedBalance);
+                  const balance = token.numericBalance; // Use numericBalance for calculation
                   const calculatedValue = balance * tokenPrice;
                   
-                  // Debug logging for WETH specifically
-                  if (cleanSymbol === 'WETH') {
-                    console.log(`🔧 WETH DEBUG: symbol=${token.metadata.symbol}, cleanSymbol=${cleanSymbol}`);
-                    console.log(`🔧 WETH DEBUG: balance=${balance}, tokenPrice=${tokenPrice}, calculatedValue=${calculatedValue}`);
-                    console.log(`🔧 WETH DEBUG: formattedBalance="${token.formattedBalance}"`);
-                  }
                   
                   const tokenInfo = {
                     symbol: cleanSymbol, // Use cleaned symbol for display (USDC instead of USDC_1)
@@ -277,19 +265,19 @@ export default function Portfolio() {
           console.warn(`⚠️ Failed to fetch PGS 24h change:`, pgsChangeError.message);
         }
 
-        // Fetch PGS token balance separately (deployed on Arbitrum)
+        // Fetch PGS token balance using the same method as token-test page
         try {
-          console.log(`🔍 Fetching PGS balance for wallet ${address} on Arbitrum...`);
-          const pgsResponse = await fetch(`/api/wallet/tokens?walletAddress=${address}&chainId=${PGS_TOKEN_CONFIG.chainId}&tokenAddress=${PGS_TOKEN_CONFIG.address}`);
+          console.log(`🔍 Fetching PGS balance for wallet ${address} using enhanced API...`);
+          const pgsResponse = await fetch(`/api/get-balance?userAddress=${address}`);
           if (pgsResponse.ok) {
             const pgsData = await pgsResponse.json();
-            console.log(`📊 PGS API response:`, pgsData);
+            console.log(`📊 Enhanced PGS API response:`, pgsData);
 
-            if (pgsData.success && pgsData.balance) {
-              const foundPgsBalance = parseFloat(pgsData.balance.formatted);
+            if (pgsData.success && pgsData.balance && parseFloat(pgsData.balance) > 0) {
+              const foundPgsBalance = parseFloat(pgsData.balance);
               console.log(`💰 PGS balance found: ${foundPgsBalance} PGS`);
               
-              const realPgsBalance = parseFloat(pgsData.balance.formatted);
+              const realPgsBalance = parseFloat(pgsData.balance);
               const pgsCurrentPrice = pgsPriceData?.price || 0; // Use 0 if 1inch API fails (no hardcoded fallbacks)
               
               const pgsToken = {
@@ -318,7 +306,7 @@ export default function Portfolio() {
                 name: PGS_TOKEN_CONFIG.name,
                 balance: "0.00",
                 value: 0,
-                price: 2.70, // Default PGS price
+                price: 0, // PGS price set to $0
                 change24h: pgsChange24h,
                 logo: PGS_TOKEN_CONFIG.logo,
                 chainId: PGS_TOKEN_CONFIG.chainId,
