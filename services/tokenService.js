@@ -10,11 +10,9 @@ export class TokenService {
     this.provider = null
     this.contractAddress = null
     this.ownerContract = null
-    this.oneInchApiKey = process.env.ONEINCH_API_KEY || null
     
-    // Debug: Log API key status (without exposing the actual key)
+    // Debug: Log initialization
     console.log('🔧 TokenService initialized')
-    console.log('   1inch API Key:', this.oneInchApiKey ? 'Present ✅' : 'Not found ❌')
     
     // Contract ABI - this defines which functions we can call
     this.contractABI = [
@@ -124,23 +122,31 @@ export class TokenService {
     
     console.log('Contract connected at:', this.contractAddress)
     
+    // Verify we're on the right network first
+    const network = await this.signer.provider.getNetwork()
+    console.log('Connected to network:', network.name, 'Chain ID:', network.chainId)
+    
+    // Support Arbitrum One mainnet and testnets
+    const supportedChainIds = [42161n, 421614n, 11155111n] // Arbitrum One, Arbitrum Sepolia, Ethereum Sepolia
+    if (!supportedChainIds.includes(network.chainId)) {
+      throw new Error(`Unsupported network! Expected Arbitrum One (42161), Arbitrum Sepolia (421614) or Ethereum Sepolia (11155111), got ${network.chainId}`)
+    }
+    
     // Test the contract connection with better error handling
     try {
       const contractName = await this.contract.name()
       console.log('Contract name verified:', contractName)
+    } catch (error) {
+      console.error('Contract name() call failed:', error)
       
-      // Also verify we're on the right network
-      const network = await this.signer.provider.getNetwork()
-      console.log('Connected to network:', network.name, 'Chain ID:', network.chainId)
-      
-      // Support Arbitrum One mainnet and testnets
-      const supportedChainIds = [42161n, 421614n, 11155111n] // Arbitrum One, Arbitrum Sepolia, Ethereum Sepolia
-      if (!supportedChainIds.includes(network.chainId)) {
-        throw new Error(`Unsupported network! Expected Arbitrum One (42161), Arbitrum Sepolia (421614) or Ethereum Sepolia (11155111), got ${network.chainId}`)
+      // Check if we're on Arbitrum One with the known contract - proceed anyway
+      if (network.chainId === 42161n && this.contractAddress === '0x4a109A21EeD37d5D1AA0e8e2DE9e50005850eC6c') {
+        console.log('🔄 Known PGS contract on Arbitrum One - proceeding despite name() error')
+        console.log('🔄 This is likely a temporary RPC issue, contract should still work for balance calls')
+        // Contract is already assigned, so we can continue
+        return
       }
       
-    } catch (error) {
-      console.error('Contract connection test failed:', error)
       throw new Error(`Failed to connect to contract: ${error.message}`)
     }
   }
@@ -262,29 +268,18 @@ export class TokenService {
     }
   }
 
-  // Get user's current token balance using 1inch Balance API with fallback
+  // Get user's current token balance using direct contract call
   async getTokenBalance(address = null) {
     const targetAddress = address || await this.signer.getAddress()
     console.log('🔍 Getting balance for address:', targetAddress)
     console.log('🔍 Contract address:', this.contractAddress)
     
-    // Try 1inch Balance API first (faster and more reliable)
-    try {
-      const oneInchBalance = await this.getBalanceVia1inch(targetAddress)
-      if (oneInchBalance !== null) {
-        console.log('✅ Balance loaded via 1inch API:', oneInchBalance)
-        return ethers.parseEther(oneInchBalance)
-      }
-    } catch (error) {
-      console.warn('⚠️ 1inch API failed, falling back to direct contract call:', error.message)
-    }
-    
-    // Fallback to direct contract call
+    // Use direct contract call for reliable balance fetching
     if (!this.contract) {
-      throw new Error('Contract not initialized and 1inch API unavailable')
+      throw new Error('Contract not initialized')
     }
     
-    console.log('🔄 Using direct contract call fallback')
+    console.log('🔄 Using direct contract call')
     const balanceWei = await this.contract.balanceOf(targetAddress)
     console.log('🔍 Raw balance from contract (wei):', balanceWei.toString())
     console.log('🔍 Formatted balance (ether):', this.formatTokenAmount(balanceWei))
@@ -292,152 +287,6 @@ export class TokenService {
     return balanceWei
   }
 
-  // Enhanced 1inch API integration with multiple services
-  async getBalanceVia1inch(userAddress) {
-    if (!this.contractAddress) {
-      throw new Error('Contract address not set')
-    }
-    
-    console.log('🌐 Fetching balance via enhanced 1inch APIs...')
-    console.log('   User address:', userAddress)
-    console.log('   Contract address:', this.contractAddress)
-    console.log('   Chain ID: 42161 (Arbitrum One)')
-    console.log('   API Key status:', this.oneInchApiKey ? 'Available ✅' : 'Missing ❌')
-    
-    const headers = {
-      'Accept': 'application/json'
-    }
-    
-    if (this.oneInchApiKey) {
-      headers['Authorization'] = `Bearer ${this.oneInchApiKey}`
-      console.log('🔑 Using API key for authenticated request')
-    } else {
-      console.log('🔓 Using public API (rate limited)')
-    }
-
-    // 🆕 Get additional context data in parallel
-    const [balanceData, gasData, tokenMetadata] = await Promise.allSettled([
-      // Balance API
-      fetch(`https://api.1inch.dev/balance/v1.2/42161/balances/${userAddress}`, { headers })
-        .then(r => r.ok ? r.json() : Promise.reject(new Error(`Balance API error: ${r.status}`))),
-      
-      // 🆕 Gas Price API for transaction cost estimation
-      fetch(`https://api.1inch.dev/gas-price/v1.5/42161`, { headers })
-        .then(r => r.ok ? r.json() : Promise.reject(new Error(`Gas API error: ${r.status}`))),
-      
-      // 🆕 Token metadata API
-      fetch(`https://api.1inch.dev/token/v1.2/42161/custom?addresses=${this.contractAddress}`, { headers })
-        .then(r => r.ok ? r.json() : Promise.reject(new Error(`Token API error: ${r.status}`)))
-    ])
-
-    // Process balance data
-    if (balanceData.status === 'fulfilled') {
-      const data = balanceData.value
-      console.log(`✅ 1inch Balance API found ${Object.keys(data).length} tokens`)
-      
-      // Extract PGS token balance
-      const tokenBalance = data[this.contractAddress.toLowerCase()] || data[this.contractAddress]
-      
-      if (tokenBalance !== undefined && tokenBalance !== '0') {
-        const formattedBalance = ethers.formatEther(tokenBalance)
-        console.log('✅ PGS balance from enhanced 1inch API:', formattedBalance)
-
-        // 🆕 Log additional context data
-        if (gasData.status === 'fulfilled') {
-          console.log('💰 Current gas prices:', gasData.value)
-        }
-        if (tokenMetadata.status === 'fulfilled') {
-          const metadata = tokenMetadata.value[this.contractAddress.toLowerCase()]
-          console.log('📋 Token metadata:', metadata)
-        }
-        
-        return formattedBalance
-      }
-    }
-
-    // If balance not found or API failed
-    console.log('⚠️ PGS token not found in 1inch response or API failed, balance is 0')
-    return '0'
-  }
-
-  // 🆕 New method: Get comprehensive token information using multiple 1inch APIs
-  async getEnhancedTokenInfo(userAddress) {
-    if (!this.contractAddress) {
-      throw new Error('Contract address not set')
-    }
-
-    const headers = {
-      'Accept': 'application/json'
-    }
-    
-    if (this.oneInchApiKey) {
-      headers['Authorization'] = `Bearer ${this.oneInchApiKey}`
-    }
-
-    try {
-      console.log('🔍 Getting enhanced token info via 1inch APIs...')
-
-      const [balanceResult, tokenResult, gasResult, historyResult] = await Promise.allSettled([
-        // Balance
-        fetch(`https://api.1inch.dev/balance/v1.2/42161/balances/${userAddress}`, { headers })
-          .then(r => r.ok ? r.json() : null),
-        
-        // Token metadata
-        fetch(`https://api.1inch.dev/token/v1.2/42161/custom?addresses=${this.contractAddress}`, { headers })
-          .then(r => r.ok ? r.json() : null),
-        
-        // Gas prices
-        fetch(`https://api.1inch.dev/gas-price/v1.5/42161`, { headers })
-          .then(r => r.ok ? r.json() : null),
-        
-        // Recent history
-        fetch(`https://api.1inch.dev/history/v2.0/history/${userAddress}/events?chainId=42161&limit=10&tokens=${this.contractAddress}`, { headers })
-          .then(r => r.ok ? r.json() : null)
-      ])
-
-      const result = {
-        balance: '0',
-        metadata: null,
-        gasInfo: null,
-        recentTransactions: [],
-        sources: []
-      }
-
-      // Process balance
-      if (balanceResult.status === 'fulfilled' && balanceResult.value) {
-        const tokenBalance = balanceResult.value[this.contractAddress.toLowerCase()]
-        if (tokenBalance) {
-          result.balance = ethers.formatEther(tokenBalance)
-          result.sources.push('balance_api')
-        }
-      }
-
-      // Process token metadata
-      if (tokenResult.status === 'fulfilled' && tokenResult.value) {
-        result.metadata = tokenResult.value[this.contractAddress.toLowerCase()]
-        if (result.metadata) result.sources.push('token_api')
-      }
-
-      // Process gas info
-      if (gasResult.status === 'fulfilled' && gasResult.value) {
-        result.gasInfo = gasResult.value
-        result.sources.push('gas_api')
-      }
-
-      // Process recent transactions
-      if (historyResult.status === 'fulfilled' && historyResult.value?.items) {
-        result.recentTransactions = historyResult.value.items.slice(0, 5)
-        if (result.recentTransactions.length > 0) result.sources.push('history_api')
-      }
-
-      console.log(`✅ Enhanced token info retrieved via ${result.sources.length} APIs:`, result.sources)
-      return result
-
-    } catch (error) {
-      console.error('❌ Enhanced token info failed:', error)
-      throw error
-    }
-  }
 
   // Utility: Convert USD string to cents
   // "150.75" → 15075

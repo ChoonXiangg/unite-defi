@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Geist, Geist_Mono } from "next/font/google";
 import { WalletService } from "../utils/walletUtils";
+import { tokenService } from "../services/tokenService";
+import { ethers } from 'ethers';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,6 +25,9 @@ export default function NFT() {
   const [expandedPegasus, setExpandedPegasus] = useState(null);
   const [equippedPegasus, setEquippedPegasus] = useState(null);
   const [pgsBalance, setPgsBalance] = useState(0);
+  const [loadingBalance, setLoadingBalance] = useState(false);
+  const [tokenServiceInitialized, setTokenServiceInitialized] = useState(false);
+  const [currentNetwork, setCurrentNetwork] = useState(null);
 
   // Drawable NFTs (excludes pegasus NFTs)
   const drawableNFTs = [
@@ -182,14 +187,131 @@ export default function NFT() {
     }
   };
 
+  // Load real PGS balance from wallet
+  const loadRealPgsBalance = async () => {
+    if (!walletConnected || !walletAddress || !tokenServiceInitialized) {
+      console.log('Cannot load PGS balance: wallet not connected or token service not initialized');
+      console.log('  - Wallet connected:', walletConnected);
+      console.log('  - Wallet address:', walletAddress);
+      console.log('  - Token service initialized:', tokenServiceInitialized);
+      return;
+    }
+
+    setLoadingBalance(true);
+    try {
+      console.log('🔍 Loading real PGS balance from wallet...');
+      console.log('🔍 Wallet address:', walletAddress);
+      console.log('🔍 Current network:', currentNetwork);
+      
+      const balanceWei = await tokenService.getTokenBalance(walletAddress);
+      const balanceFormatted = parseFloat(tokenService.formatTokenAmount(balanceWei));
+      
+      console.log('✅ Real PGS balance loaded:', balanceFormatted);
+      console.log('✅ Balance in wei:', balanceWei.toString());
+      setPgsBalance(balanceFormatted);
+      
+      // Also save to localStorage as backup
+      localStorage.setItem('pgsBalance', balanceFormatted.toString());
+    } catch (error) {
+      console.error('❌ Failed to load PGS balance:', error);
+      console.error('❌ Error details:', error.message);
+      // Fallback to localStorage if available
+      const storedBalance = localStorage.getItem('pgsBalance');
+      if (storedBalance) {
+        setPgsBalance(parseFloat(storedBalance));
+        console.log('Using stored PGS balance as fallback:', storedBalance);
+      }
+    } finally {
+      setLoadingBalance(false);
+    }
+  };
+
+  // Initialize token service when wallet connects
+  const initializeTokenService = async () => {
+    if (!window.ethereum || !walletAddress) {
+      console.log('Cannot initialize token service: no ethereum provider or wallet address');
+      return;
+    }
+
+    try {
+      console.log('🔧 Initializing token service...');
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      
+      // Check current network
+      const network = await provider.getNetwork();
+      console.log('📡 Current network:', network.name, 'Chain ID:', network.chainId.toString());
+      setCurrentNetwork({
+        name: network.name,
+        chainId: network.chainId.toString()
+      });
+      
+      // Check if we're on the right network (Arbitrum One = 42161)
+      if (network.chainId !== 42161n) {
+        console.warn('⚠️ Not connected to Arbitrum One mainnet');
+        console.log('Available networks: Arbitrum One (42161), Arbitrum Sepolia (421614)');
+        
+        // Check if we have deployment for this network
+        const supportedChains = ['42161', '421614']; // Arbitrum One, Arbitrum Sepolia
+        if (supportedChains.includes(network.chainId.toString())) {
+          console.log('🔄 This network has PGS deployment, proceeding...');
+        } else {
+          alert(`Please switch to a supported network to use PGS tokens.\n\nCurrent network: ${network.name} (${network.chainId})\nSupported: Arbitrum One (42161) or Arbitrum Sepolia (421614)`);
+          return;
+        }
+      }
+      
+      // Special handling for known wallet
+      if (walletAddress === '0x7184B01a8A9ac24428bB8d3925701D151920C9Ce') {
+        console.log('🎯 Detected user wallet with PGS tokens!');
+        console.log('🎯 PGS Contract: 0x4a109A21EeD37d5D1AA0e8e2DE9e50005850eC6c');
+        console.log('🎯 Network: Arbitrum One (42161)');
+      }
+      
+      const success = await tokenService.initialize(provider, walletAddress);
+      
+      if (success) {
+        setTokenServiceInitialized(true);
+        console.log('✅ Token service initialized successfully');
+        // Load balance after initialization
+        await loadRealPgsBalance();
+      } else {
+        console.error('❌ Token service initialization failed');
+        alert('Failed to initialize PGS token service. Please try refreshing the page.');
+      }
+    } catch (error) {
+      console.error('❌ Error initializing token service:', error);
+      
+      if (error.message.includes('BAD_DATA')) {
+        alert('Contract not found on current network. Please make sure you\'re connected to Arbitrum One mainnet.');
+      } else if (error.message.includes('deployment info')) {
+        alert('PGS token contract deployment info not found. Please contact support.');
+      } else {
+        alert(`Error connecting to PGS token: ${error.message}`);
+      }
+    }
+  };
+
   useEffect(() => {
     // Check if wallet is already connected
     const checkWalletConnection = async () => {
       if (window.ethereum && window.ethereum.selectedAddress) {
         try {
           const { address } = await walletService.connectWallet();
+          console.log('🔗 Wallet connected:', address);
           setWalletConnected(true);
           setWalletAddress(address);
+          // Check network immediately
+          if (window.ethereum) {
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const network = await provider.getNetwork();
+            console.log('📡 Connected to network:', network.name, 'Chain ID:', network.chainId.toString());
+            setCurrentNetwork({
+              name: network.name,
+              chainId: network.chainId.toString()
+            });
+          }
+          // Initialize token service when wallet connects
+          setTimeout(() => initializeTokenService(), 1000);
         } catch (error) {
           console.log('Wallet auto-connection failed:', error);
         }
@@ -260,10 +382,23 @@ export default function NFT() {
     loadOwnedNFTs();
   }, [walletService]);
 
-  const handleOpenChest = () => {
+  // Initialize token service when wallet address is available
+  useEffect(() => {
+    if (walletConnected && walletAddress && !tokenServiceInitialized) {
+      initializeTokenService();
+    }
+  }, [walletConnected, walletAddress, tokenServiceInitialized]);
+
+  const handleOpenChest = async () => {
     // Check if user has enough PGS
     if (pgsBalance < 5) {
       alert('Sorry, you don\'t have enough PGS to buy the chest');
+      return;
+    }
+
+    // Check if token service is initialized
+    if (!tokenServiceInitialized) {
+      alert('Please wait for wallet to connect properly');
       return;
     }
 
@@ -274,14 +409,34 @@ export default function NFT() {
     if (availableNFTs.length === 0) {
       // All NFTs have been collected
       alert('🎉 Congratulations! You have collected everything in the collection! All NFTs have been unlocked!');
-    } else {
-      // Deduct 5 PGS and update localStorage
-      const newBalance = pgsBalance - 5;
-      setPgsBalance(newBalance);
-      localStorage.setItem('pgsBalance', newBalance.toString());
+      return;
+    }
+
+    try {
+      // Show spending confirmation
+      const confirmSpend = confirm(`Spend 5 PGS to open a chest?\n\nCurrent balance: ${pgsBalance.toFixed(2)} PGS`);
+      if (!confirmSpend) return;
+
+      console.log('💰 Spending 5 PGS tokens to open chest...');
       
-      // Still have NFTs to collect, go to chest page
-      window.location.href = '/chest-open';
+      // Spend tokens on the blockchain
+      const spendResult = await tokenService.spendTokens('5', 'NFT Chest');
+      
+      if (spendResult.success) {
+        console.log('✅ Successfully spent 5 PGS tokens');
+        console.log('Transaction hash:', spendResult.txHash);
+        
+        // Update balance after successful spending
+        await loadRealPgsBalance();
+        
+        // Go to chest page
+        window.location.href = '/chest-open';
+      } else {
+        alert(`Failed to spend PGS tokens: ${spendResult.error}`);
+      }
+    } catch (error) {
+      console.error('❌ Error spending PGS tokens:', error);
+      alert(`Error opening chest: ${error.message}`);
     }
   };
 
@@ -378,14 +533,42 @@ export default function NFT() {
               <div className="bg-gray-700/80 backdrop-blur-sm rounded-lg px-4 py-2 border border-gray-600 shadow-sm">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${walletConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                  <span className="text-sm font-mono text-gray-300">
-                    {walletConnected 
-                      ? `${walletAddress?.slice(0, 6)}...${walletAddress?.slice(-4)}`
-                      : 'Not Connected'
-                    }
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-mono text-gray-300">
+                      {walletConnected 
+                        ? `${walletAddress?.slice(0, 6)}...${walletAddress?.slice(-4)}`
+                        : 'Not Connected'
+                      }
+                    </span>
+                    {currentNetwork && (
+                      <span className={`text-xs ${currentNetwork.chainId === '42161' ? 'text-green-400' : 'text-yellow-400'}`}>
+                        {currentNetwork.chainId === '42161' ? '✓ Arbitrum One' : `⚠️ ${currentNetwork.name}`}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
+              
+              {/* Connect Wallet Button */}
+              {!walletConnected && (
+                <button 
+                  onClick={async () => {
+                    try {
+                      const { address } = await walletService.connectWallet();
+                      setWalletConnected(true);
+                      setWalletAddress(address);
+                      // Initialize token service after connecting
+                      setTimeout(() => initializeTokenService(), 1000);
+                    } catch (error) {
+                      console.error('Failed to connect wallet:', error);
+                      alert('Failed to connect wallet. Please try again.');
+                    }
+                  }}
+                  className="bg-blue-600/80 backdrop-blur-sm rounded-lg px-4 py-2 border border-blue-500 shadow-sm hover:bg-blue-500/90 transition-colors text-white font-medium"
+                >
+                  Connect Wallet
+                </button>
+              )}
               
               {/* Settings Icon */}
               <button className="bg-gray-700/80 backdrop-blur-sm rounded-lg p-2 border border-gray-600 shadow-sm hover:bg-gray-600/90 transition-colors">
@@ -593,9 +776,68 @@ export default function NFT() {
                 >
                   5 PGS
                 </button>
-                <p className="text-sm text-gray-300 mt-3 font-supercell">
-                  You have: {pgsBalance.toFixed(2)} PGS
-                </p>
+                <div className="mt-3">
+                  <p className="text-sm text-gray-300 font-supercell">
+                    You have: {loadingBalance ? (
+                      <span className="text-yellow-400">Loading...</span>
+                    ) : (
+                      <span className="text-green-400">{pgsBalance.toFixed(2)} PGS</span>
+                    )}
+                  </p>
+                  {tokenServiceInitialized && (
+                    <button
+                      onClick={loadRealPgsBalance}
+                      disabled={loadingBalance}
+                      className="text-xs text-blue-400 hover:text-blue-300 mt-1 underline disabled:opacity-50"
+                    >
+                      🔄 Refresh Balance
+                    </button>
+                  )}
+                  {!walletConnected && (
+                    <p className="text-xs text-yellow-400 mt-1">
+                      Connect wallet to load real PGS balance
+                    </p>
+                  )}
+                  {walletConnected && !tokenServiceInitialized && (
+                    <div className="text-xs text-yellow-400 mt-1">
+                      <p>Initializing PGS service...</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            console.log('🔄 Manual retry initialization');
+                            initializeTokenService();
+                          }}
+                          className="text-blue-400 hover:text-blue-300 underline"
+                        >
+                          Retry Connection
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              console.log('🔄 Direct balance check for wallet:', walletAddress);
+                              const provider = new ethers.BrowserProvider(window.ethereum);
+                              const contract = new ethers.Contract(
+                                '0x4a109A21EeD37d5D1AA0e8e2DE9e50005850eC6c',
+                                ['function balanceOf(address) view returns (uint256)'],
+                                provider
+                              );
+                              const balance = await contract.balanceOf(walletAddress);
+                              const formatted = ethers.formatEther(balance);
+                              console.log('✅ Direct balance check result:', formatted);
+                              setPgsBalance(parseFloat(formatted));
+                              setTokenServiceInitialized(true);
+                            } catch (error) {
+                              console.error('❌ Direct balance check failed:', error);
+                            }
+                          }}
+                          className="text-green-400 hover:text-green-300 underline"
+                        >
+                          Direct Check
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
