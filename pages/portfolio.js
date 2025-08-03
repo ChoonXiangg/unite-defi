@@ -85,8 +85,9 @@ export default function Portfolio() {
             chain.tokens.forEach(token => {
               if (token.metadata && token.numericBalance > 0) {
                 tokenPromises.push(async () => {
-                  // Clean token symbol and fetch real price from 1inch API with fallbacks
+                  // Clean token symbol and fetch real price + 24h change from 1inch API
                   let tokenPrice = 0;
+                  let change24h = 0;
                   
                   // Clean the token symbol (remove suffixes like _1, _2, etc.)
                   const cleanSymbol = token.metadata.symbol.replace(/_\d+$/, '');
@@ -95,6 +96,7 @@ export default function Portfolio() {
                   console.log(`🔍 Processing token: ${token.metadata.symbol} -> ${cleanSymbol} on chain ${chainId}`);
                   
                   try {
+                    // Get current price from 1inch API
                     const priceResponse = await fetch(`/api/price/realtime-oneinch?tokenSymbol=${cleanSymbol}&chainId=${chainId}`);
                     if (priceResponse.ok) {
                       const priceData = await priceResponse.json();
@@ -109,6 +111,21 @@ export default function Portfolio() {
                       }
                     } else {
                       throw new Error(`HTTP ${priceResponse.status}`);
+                    }
+                    
+                    // Get 24h change from 1inch historical API
+                    try {
+                      const historicalResponse = await fetch(`/api/price/oneinch-historical?tokenSymbol=${cleanSymbol}&chainId=${chainId}&days=1`);
+                      if (historicalResponse.ok) {
+                        const historicalData = await historicalResponse.json();
+                        if (historicalData.success) {
+                          change24h = historicalData.change24h || 0;
+                          console.log(`📈 1inch 24h change for ${cleanSymbol}: ${change24h}%`);
+                        }
+                      }
+                    } catch (changeError) {
+                      console.warn(`⚠️ Failed to fetch 24h change for ${cleanSymbol}:`, changeError.message);
+                      change24h = 0;
                     }
                   } catch (error) {
                     console.error(`❌ Failed to fetch 1inch price for ${cleanSymbol} on chain ${chainId}:`, error.message);
@@ -136,7 +153,7 @@ export default function Portfolio() {
                     balance: token.formattedBalance,
                     value: calculatedValue,
                     price: tokenPrice,
-                    change24h: result.data.tokenLogos[token.metadata.symbol]?.priceChange24h || 0,
+                    change24h: change24h, // Use 1inch historical data instead of CoinGecko
                     logo: result.data.tokenLogos[token.metadata.symbol]?.logoUrl || token.metadata.logoURI || `https://via.placeholder.com/40x40/666666/ffffff?text=${cleanSymbol}`,
                     chainId: token.chainId,
                     chainName: token.chainName,

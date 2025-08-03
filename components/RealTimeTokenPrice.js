@@ -98,10 +98,10 @@ const RealTimeTokenPrice = ({
     }
   };
 
-  // Fetch historical chart data from CoinGecko
+  // Fetch historical chart data from 1inch API
   const fetchChartData = async () => {
     try {
-      const response = await fetch(`/api/price/coingecko-chart?coinId=${coinGeckoId}&days=1`);
+      const response = await fetch(`/api/price/oneinch-historical?tokenSymbol=${tokenName}&days=1`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -109,7 +109,7 @@ const RealTimeTokenPrice = ({
       
       const data = await response.json();
       
-      if (data.success || data.usingFallback) {
+      if (data.success) {
         const prices = data.data;
         const labels = prices.map(item => item.time);
         const priceData = prices.map(item => item.price);
@@ -120,28 +120,26 @@ const RealTimeTokenPrice = ({
             {
               label: `${tokenName} Price (USD)`,
               data: priceData,
-              borderColor: data.usingFallback ? '#f59e0b' : '#10b981',
-              backgroundColor: data.usingFallback ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+              borderColor: '#10b981', // Green for 1inch data
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
               borderWidth: 2,
               fill: true,
               tension: 0.4,
               pointRadius: 0,
               pointHoverRadius: 4,
-              pointHoverBackgroundColor: data.usingFallback ? '#f59e0b' : '#10b981',
+              pointHoverBackgroundColor: '#10b981',
               pointHoverBorderColor: '#ffffff',
               pointHoverBorderWidth: 2
             }
           ]
         });
         
-        if (data.usingFallback) {
-          setError(prev => prev ? `${prev}; ${data.fallbackMessage}` : data.fallbackMessage);
-        }
+        console.log(`📈 1inch chart data loaded for ${tokenName}: ${prices.length} points, 24h change: ${data.change24h}%`);
       } else {
-        throw new Error(data.error || 'Unknown chart API error');
+        throw new Error(data.error || 'Unknown 1inch historical API error');
       }
     } catch (err) {
-      console.error('Error fetching chart data:', err);
+      console.error('Error fetching 1inch chart data:', err);
       setError(prev => prev ? `${prev}; Chart unavailable` : 'Chart data unavailable');
     }
   };
@@ -278,7 +276,7 @@ const RealTimeTokenPrice = ({
 
       {/* Footer */}
       <div className="flex items-center justify-between text-xs text-gray-400">
-        <span>24-hour price history (CoinGecko)</span>
+        <span>24-hour price simulation (1inch API)</span>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
           <span>Live prices via 1inch API (5s updates)</span>
