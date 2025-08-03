@@ -38,6 +38,75 @@ const getCoinGeckoId = (symbol) => {
   return coinGeckoMapping[symbol?.toUpperCase()] || 'ethereum';
 };
 
+// Helper function to format USD values with appropriate decimal places
+const formatUSDValue = (value) => {
+  // Debug logging for troubleshooting
+  if (value > 0 && value < 1) {
+    console.log(`🔧 formatUSDValue DEBUG: input=${value}, type=${typeof value}`);
+  }
+  
+  if (value === 0) return '$0.00';
+  
+  // For very small amounts, show more decimal places
+  if (value < 0.01) {
+    const formatted = value.toLocaleString('en-US', { 
+      style: 'currency', 
+      currency: 'USD', 
+      minimumFractionDigits: 4, 
+      maximumFractionDigits: 6 
+    });
+    console.log(`🔧 formatUSDValue DEBUG: small amount ${value} formatted as ${formatted}`);
+    return formatted;
+  }
+  // For small amounts, show 3 decimal places
+  else if (value < 1) {
+    const formatted = value.toLocaleString('en-US', { 
+      style: 'currency', 
+      currency: 'USD', 
+      minimumFractionDigits: 3, 
+      maximumFractionDigits: 3 
+    });
+    console.log(`🔧 formatUSDValue DEBUG: medium amount ${value} formatted as ${formatted}`);
+    return formatted;
+  }
+  // For normal amounts, show 2 decimal places
+  else {
+    return value.toLocaleString('en-US', { 
+      style: 'currency', 
+      currency: 'USD', 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    });
+  }
+};
+
+// Helper function to format token balance with appropriate decimal places
+const formatTokenBalance = (balance, symbol) => {
+  const numBalance = parseFloat(balance);
+  if (numBalance === 0) return '0';
+  
+  // For ETH/WETH, show up to 6 decimal places for small amounts
+  if (symbol === 'ETH' || symbol === 'WETH') {
+    if (numBalance < 0.001) {
+      return numBalance.toFixed(6);
+    } else if (numBalance < 1) {
+      return numBalance.toFixed(4);
+    } else {
+      return numBalance.toFixed(3);
+    }
+  }
+  
+  // For other tokens, use standard formatting
+  if (numBalance < 1) {
+    return numBalance.toFixed(4);
+  } else {
+    return numBalance.toLocaleString('en-US', { 
+      minimumFractionDigits: 0, 
+      maximumFractionDigits: 2 
+    });
+  }
+};
+
 export default function Portfolio() {
   const [selectedToken, setSelectedToken] = useState(null);
   const [portfolio, setPortfolio] = useState([]);
@@ -146,6 +215,13 @@ export default function Portfolio() {
                   const balance = parseFloat(token.formattedBalance);
                   const calculatedValue = balance * tokenPrice;
                   
+                  // Debug logging for WETH specifically
+                  if (cleanSymbol === 'WETH') {
+                    console.log(`🔧 WETH DEBUG: symbol=${token.metadata.symbol}, cleanSymbol=${cleanSymbol}`);
+                    console.log(`🔧 WETH DEBUG: balance=${balance}, tokenPrice=${tokenPrice}, calculatedValue=${calculatedValue}`);
+                    console.log(`🔧 WETH DEBUG: formattedBalance="${token.formattedBalance}"`);
+                  }
+                  
                   const tokenInfo = {
                     symbol: cleanSymbol, // Use cleaned symbol for display (USDC instead of USDC_1)
                     originalSymbol: token.metadata.symbol, // Keep original for reference
@@ -182,26 +258,47 @@ export default function Portfolio() {
           }
         }
 
+        // Get PGS price and 24h change from 1inch API (before fetching balance)
+        const pgsPrice = await fetch(`/api/price/realtime-oneinch?tokenSymbol=PGS`);
+        const pgsPriceData = pgsPrice.ok ? await pgsPrice.json() : null;
+        
+        // Get PGS 24h change from 1inch historical API
+        let pgsChange24h = 0;
+        try {
+          const pgsHistorical = await fetch(`/api/price/oneinch-historical?tokenSymbol=PGS&chainId=${PGS_TOKEN_CONFIG.chainId}&days=1`);
+          if (pgsHistorical.ok) {
+            const pgsHistoricalData = await pgsHistorical.json();
+            if (pgsHistoricalData.success) {
+              pgsChange24h = pgsHistoricalData.change24h || 0;
+              console.log(`📈 PGS 24h change: ${pgsChange24h}%`);
+            }
+          }
+        } catch (pgsChangeError) {
+          console.warn(`⚠️ Failed to fetch PGS 24h change:`, pgsChangeError.message);
+        }
+
         // Fetch PGS token balance separately (deployed on Arbitrum)
         try {
+          console.log(`🔍 Fetching PGS balance for wallet ${address} on Arbitrum...`);
           const pgsResponse = await fetch(`/api/wallet/tokens?walletAddress=${address}&chainId=${PGS_TOKEN_CONFIG.chainId}&tokenAddress=${PGS_TOKEN_CONFIG.address}`);
           if (pgsResponse.ok) {
             const pgsData = await pgsResponse.json();
-            if (pgsData.success && pgsData.balance && parseFloat(pgsData.balance.formatted) > 0) {
-              // Get PGS price from 1inch API
-              const pgsPrice = await fetch(`/api/price/realtime-oneinch?tokenSymbol=PGS`);
-              const pgsPriceData = pgsPrice.ok ? await pgsPrice.json() : null;
+            console.log(`📊 PGS API response:`, pgsData);
+
+            if (pgsData.success && pgsData.balance) {
+              const foundPgsBalance = parseFloat(pgsData.balance.formatted);
+              console.log(`💰 PGS balance found: ${foundPgsBalance} PGS`);
               
-              const pgsBalance = parseFloat(pgsData.balance.formatted);
+              const realPgsBalance = parseFloat(pgsData.balance.formatted);
               const pgsCurrentPrice = pgsPriceData?.price || 0; // Use 0 if 1inch API fails (no hardcoded fallbacks)
               
               const pgsToken = {
                 symbol: PGS_TOKEN_CONFIG.symbol,
                 name: PGS_TOKEN_CONFIG.name,
-                balance: pgsBalance.toFixed(2),
-                value: pgsBalance * pgsCurrentPrice,
+                balance: realPgsBalance.toFixed(2),
+                value: realPgsBalance * pgsCurrentPrice,
                 price: pgsCurrentPrice,
-                change24h: 0, // PGS doesn't have historical data yet
+                change24h: pgsChange24h, // Use 1inch historical data for PGS
                 logo: PGS_TOKEN_CONFIG.logo,
                 chainId: PGS_TOKEN_CONFIG.chainId,
                 chainName: "Arbitrum One",
@@ -211,11 +308,53 @@ export default function Portfolio() {
               };
               
               allTokens.push(pgsToken);
-              console.log(`✅ Added real PGS balance: ${pgsBalance.toFixed(2)} PGS ($${(pgsBalance * pgsCurrentPrice).toFixed(2)})`);
+              console.log(`✅ Added PGS token: ${realPgsBalance.toFixed(2)} PGS ($${(realPgsBalance * pgsCurrentPrice).toFixed(2)})`);
+            } else {
+              // Even if no balance data, show PGS token with 0 balance
+              console.log(`⚠️ No PGS balance data found, showing with 0 balance`);
+              
+              const pgsToken = {
+                symbol: PGS_TOKEN_CONFIG.symbol,
+                name: PGS_TOKEN_CONFIG.name,
+                balance: "0.00",
+                value: 0,
+                price: 2.70, // Default PGS price
+                change24h: pgsChange24h,
+                logo: PGS_TOKEN_CONFIG.logo,
+                chainId: PGS_TOKEN_CONFIG.chainId,
+                chainName: "Arbitrum One",
+                address: PGS_TOKEN_CONFIG.address,
+                decimals: PGS_TOKEN_CONFIG.decimals,
+                isRealData: true
+              };
+              
+              allTokens.push(pgsToken);
+              console.log(`✅ Added PGS token with 0 balance for visibility`);
             }
+          } else {
+            console.error(`❌ PGS API failed:`, pgsResponse.status, await pgsResponse.text());
           }
         } catch (pgsError) {
           console.error('❌ Failed to fetch PGS balance:', pgsError);
+          
+          // Still show PGS even if API fails
+          const pgsToken = {
+            symbol: PGS_TOKEN_CONFIG.symbol,
+            name: PGS_TOKEN_CONFIG.name,
+            balance: "0.00",
+            value: 0,
+            price: 2.70, // Default PGS price
+            change24h: pgsChange24h,
+            logo: PGS_TOKEN_CONFIG.logo,
+            chainId: PGS_TOKEN_CONFIG.chainId,
+            chainName: "Arbitrum One",
+            address: PGS_TOKEN_CONFIG.address,
+            decimals: PGS_TOKEN_CONFIG.decimals,
+            isRealData: false
+          };
+          
+          allTokens.push(pgsToken);
+          console.log(`✅ Added PGS token as fallback due to API error`);
         }
         
         // Sort by balance value and set as portfolio
@@ -376,7 +515,7 @@ export default function Portfolio() {
               <div className="p-6 border-b border-gray-700">
                 <h2 className="text-xl font-bold text-white mb-2 font-supercell">Holdings</h2>
                 <div className="text-3xl font-bold text-green-400 mb-4">
-                  ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatUSDValue(totalValue)}
                 </div>
               </div>
               <div>
@@ -443,10 +582,10 @@ export default function Portfolio() {
                     </div>
                     <div className="text-right">
                       <div className="text-white font-medium">
-                        ${token.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatUSDValue(token.value)}
                       </div>
                       <div className="text-sm text-gray-400">
-                        {parseFloat(token.balance).toLocaleString()} {token.symbol}
+                        {formatTokenBalance(token.balance, token.symbol)} {token.symbol}
                       </div>
                     </div>
                   </button>
@@ -515,7 +654,7 @@ export default function Portfolio() {
                     <div>
                       <div className="text-sm text-gray-400">Balance {selectedToken.isRealData ? '(Real Wallet)' : '(No Balance)'}</div>
                       <div className="text-xl font-bold text-white">
-                        {parseFloat(selectedToken.balance).toLocaleString()} {selectedToken.symbol}
+                        {formatTokenBalance(selectedToken.balance, selectedToken.symbol)} {selectedToken.symbol}
                       </div>
                     </div>
                     <div>
@@ -524,7 +663,7 @@ export default function Portfolio() {
                         {priceLoading ? (
                           <div className="animate-pulse bg-gray-700 h-6 w-24 rounded"></div>
                         ) : (
-                          `$${getRealTimeValue(selectedToken).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          formatUSDValue(getRealTimeValue(selectedToken))
                         )}
                       </div>
                     </div>

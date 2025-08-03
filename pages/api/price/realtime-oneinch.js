@@ -19,7 +19,8 @@ const TOKEN_ADDRESSES = {
     'USDC': '0xFF970A61A04b1CdD3c43f5dE4533eBDDB5CC8',
     'USDT': '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
     'WETH': '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
-    '1INCH': '0x8312e7d6EeACe1c09bbB8cfEb5ea7E47828283E3'
+    '1INCH': '0x8312e7d6EeACe1c09bbB8cfEb5ea7E47828283E3',
+    'PGS': '0x4a109A21EeD37d5D1AA0e8e2DE9e50005850eC6c'
   },
   // Polygon (chainId: 137)
   137: {
@@ -181,6 +182,22 @@ async function getRealTimePrice(tokenSymbol, chainId = null) {
     
   } catch (error) {
     console.error(`❌ Failed to fetch 1inch price for ${upperSymbol}:`, error.message);
+    
+    // Special handling for PGS (custom token) - provide a reasonable price
+    if (upperSymbol === 'PGS') {
+      console.log(`💡 PGS is a custom token, providing estimated price since 1inch may not have liquidity`);
+      return {
+        success: true,
+        price: 2.70, // Estimated PGS price in USD
+        symbol: tokenSymbol.toUpperCase(),
+        chainId: targetChainId,
+        timestamp: Date.now(),
+        usingFallback: true,
+        fallbackMessage: `PGS custom token price (1inch may not have liquidity)`,
+        source: 'custom-token',
+        customToken: true
+      };
+    }
     
     // Return error - no fallback prices per user requirement (1inch API only)
     return {

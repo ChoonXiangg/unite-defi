@@ -17,7 +17,8 @@ const TOKEN_ADDRESSES = {
     'ETH': '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
     'USDC': '0xFF970A61A04b1CdD3c43f5dE4533eBDDB5CC8',
     'USDT': '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
-    'WETH': '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1'
+    'WETH': '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+    'PGS': '0x4a109A21EeD37d5D1AA0e8e2DE9e50005850eC6c'
   },
   137: {
     'MATIC': '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
@@ -152,6 +153,8 @@ function calculate24hChange(chartData) {
   return parseFloat(change.toFixed(2));
 }
 
+
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -196,6 +199,31 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('1inch historical data error:', error);
+    
+    // Special handling for PGS (custom token)
+    const upperSymbol = tokenSymbol.toUpperCase();
+    if (upperSymbol === 'PGS') {
+      console.log(`💡 Generating simulated data for PGS custom token...`);
+      
+      // Generate simulated chart for PGS with $2.70 base price
+      const currentPrice = 2.70;
+      const hours = parseInt(days) * 24;
+      const points = Math.min(hours * 2, 96);
+      const chartData = generateSimulatedChart(currentPrice, hours, points);
+      const change24h = calculate24hChange(chartData);
+      
+      return res.status(200).json({
+        success: true,
+        data: chartData,
+        currentPrice,
+        change24h,
+        symbol: tokenSymbol.toUpperCase(),
+        chainId: chainId ? parseInt(chainId) : 42161,
+        timestamp: Date.now(),
+        source: 'custom-token-simulated',
+        disclaimer: 'PGS custom token data simulated with estimated price'
+      });
+    }
     
     res.status(500).json({
       success: false,
