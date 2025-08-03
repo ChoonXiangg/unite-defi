@@ -204,22 +204,23 @@ class Resolver {
                 return true; // Allow for now if LOP not deployed
             }
 
-            // Transform order to match contract struct format
+            // Transform order to match contract struct format and UI EIP-712 structure
             const orderStruct = [
                 order.maker,
+                ethers.ZeroAddress, // taker (resolver will be the taker)
                 order.makerAsset,
                 order.takerAsset,
                 order.makerAmount,
                 order.takerAmount,
                 order.deadline,
+                order.salt || order.nonce || 0, // Use salt from UI (mapped from nonce)
                 order.secretHash,
-                order.nonce || 0,
                 order.sourceChain || 11155111,
-                order.destChain || 128123,
-                '0x', // predicateData - empty for now
-                order.sourceChain || 11155111,
-                false, // gasAdjustment
-                [0, 0, ethers.ZeroAddress, [], 0, 0, '0x'] // predicateParams - default values
+                order.destinationChain || order.destChain || 128123, // Use destinationChain from UI
+                '0x', // predicate - empty for now
+                500, // maxSlippage - default 5%
+                false, // requirePriceValidation
+                [0, 0, ethers.ZeroAddress, [], 0, 0, '0x'] // priceData - default values
             ];
 
             // Call validateOrderConditions on the LOP contract
@@ -248,23 +249,26 @@ class Resolver {
 
             console.log(`⚡ Executing on ${chainName} chain...`);
 
-            // Transform order to match contract struct format
+            // Transform order to match contract struct format and UI EIP-712 structure
             const orderStruct = [
                 order.maker,
+                ethers.ZeroAddress, // taker (resolver will be the taker)
                 order.makerAsset,
                 order.takerAsset,
                 order.makerAmount,
                 order.takerAmount,
                 order.deadline,
+                order.salt || order.nonce || 0, // Use salt from UI (mapped from nonce)
                 order.secretHash,
-                order.nonce || 0,
                 order.sourceChain || 11155111,
-                order.destChain || 128123,
-                '0x', // predicateData - empty for now
-                order.sourceChain || 11155111,
-                false, // gasAdjustment
-                [0, 0, ethers.ZeroAddress, [], 0, 0, '0x'] // predicateParams - default values
+                order.destinationChain || order.destChain || 128123, // Use destinationChain from UI
+                '0x', // predicate - empty for now
+                500, // maxSlippage - default 5%
+                false, // requirePriceValidation
+                [0, 0, ethers.ZeroAddress, [], 0, 0, '0x'] // priceData - default values
             ];
+            
+            console.log('🔍 Order struct for contract:', orderStruct);
 
             // Estimate gas
             const gasEstimate = await lopContract.executeOrder.estimateGas(orderStruct, signature);

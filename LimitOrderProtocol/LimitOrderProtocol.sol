@@ -120,6 +120,7 @@ contract LimitOrderProtocol is ReentrancyGuard, Ownable, EIP712 {
     event EscrowFactoryUpdated(uint256 indexed chainId, address indexed factory);
     event ResolverAuthorized(address indexed resolver, bool authorized);
     event PriceRelayerAuthorized(address indexed relayer, bool authorized);
+    event SignatureVerificationDebug(bytes32 orderHash, address recoveredSigner, address expectedSigner, bool isValid);
 
     // =============================================================================
     // MODIFIERS
@@ -259,9 +260,15 @@ contract LimitOrderProtocol is ReentrancyGuard, Ownable, EIP712 {
         view 
         returns (bool) 
     {
+        // Get the order hash (this is the EIP-712 hash)
         bytes32 orderHash = getOrderHash(order);
-        bytes32 ethSignedMessageHash = _hashTypedDataV4(orderHash);
-        address recoveredSigner = ethSignedMessageHash.recover(signature);
+        
+        // For EIP-712 signatures, verify using the domain separator
+        // The UI uses signTypedData which creates: keccak256("\x19\x01" + domainSeparator + orderHash)
+        bytes32 domainSeparator = _domainSeparatorV4();
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, orderHash));
+        address recoveredSigner = digest.recover(signature);
+        
         return recoveredSigner == order.maker;
     }
 
@@ -330,10 +337,10 @@ contract LimitOrderProtocol is ReentrancyGuard, Ownable, EIP712 {
             order.secretHash,
             order.sourceChain,
             order.destinationChain,
-            keccak256(order.predicate),
+            order.predicate,           // ✅ Use raw bytes (classic EIP-712)
             order.maxSlippage,
             order.requirePriceValidation,
-            _hashPriceData(order.priceData)
+            order.priceData            // ✅ Use raw struct (classic EIP-712)
         )));
     }
 
@@ -343,10 +350,10 @@ contract LimitOrderProtocol is ReentrancyGuard, Ownable, EIP712 {
             priceData.price,
             priceData.timestamp,
             priceData.relayer,
-            keccak256(abi.encode(priceData.apiSources)),
+            priceData.apiSources,      // ✅ Use raw array (classic EIP-712)
             priceData.confidence,
             priceData.deviation,
-            keccak256(priceData.signature)
+            priceData.signature        // ✅ Use raw bytes (classic EIP-712)
         ));
     }
 
@@ -431,6 +438,13 @@ contract LimitOrderProtocol is ReentrancyGuard, Ownable, EIP712 {
     // =============================================================================
     // VIEW FUNCTIONS
     // =============================================================================
+
+    /**
+     * @dev Returns the domain separator for EIP-712
+     */
+    function DOMAIN_SEPARATOR() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
 
     function getOrderStatus(bytes32 orderHash) external view returns (uint256) {
         return orderStatus[orderHash];

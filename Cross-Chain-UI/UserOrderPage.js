@@ -250,18 +250,43 @@ const UserOrderPage = () => {
         throw new Error('Wallet provider not available for signing');
       }
       
-      // Use EIP-712 typed data signing to match contract's validateOrderSignature
-      // The domain should match where the LOP contract is deployed
-      const network = await wallet.provider.getNetwork();
+      // Use EIP-712 typed data signing to match enhanced-relayer validation
+      // The domain should match the SOURCE chain (where the order originates)
+      const sourceChainId = orderParams.fromChain === 'ethereum' ? 11155111 : 128123;
       
-      // Use the user's current network chainId for the domain
-      // This works because you have LOP contracts deployed on both chains
-      const domain = {
-        name: 'LimitOrderProtocol',
-        version: '1.0',
-        chainId: Number(network.chainId) // Use the user's current network
+      // Get the correct LOP contract address for the source chain
+      let verifyingContract;
+      if (sourceChainId === 11155111) { // Sepolia
+        verifyingContract = config.CONTRACTS.SEPOLIA_LOP;
+      } else if (sourceChainId === 128123) { // Etherlink
+        verifyingContract = config.CONTRACTS.ETHERLINK_LOP;
+      } else {
+        throw new Error(`Unsupported source chain: ${orderParams.fromChain}`);
+      }
+      
+      // Use the actual domain separators from contracts
+      const domainSeparators = {
+        128123: config.DOMAIN_SEPARATORS.ETHERLINK, // Etherlink
+        11155111: config.DOMAIN_SEPARATORS.SEPOLIA  // Sepolia
       };
+      
+      const domain = {
+        name: 'EtherlinkLOP',
+        version: '1',
+        chainId: sourceChainId,
+        verifyingContract: verifyingContract
+      };
+      
+      // Log the actual domain separator being used
+      const actualDomainSeparator = domainSeparators[sourceChainId];
+      if (actualDomainSeparator) {
+        console.log('🔍 Using actual domain separator from contract:', actualDomainSeparator);
+      }
 
+      
+      console.log('🔍 EIP-712 Domain:', domain);
+
+      // EIP-712 structure matching the contract's Order struct exactly
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
@@ -291,20 +316,26 @@ const UserOrderPage = () => {
         ]
       };
 
+      // Generate unique salt for this order
+      const salt = Date.now() + Math.floor(Math.random() * 1000);
+      
+      // Get destination chain ID dynamically based on user selection
+      const destinationChainId = orderParams.toChain === 'ethereum' ? 11155111 : 128123;
+      
       const value = {
         maker: order.maker,
-        taker: ethers.ZeroAddress,
+        taker: ethers.ZeroAddress, // Open order - any resolver can take
         makerAsset: order.makerAsset,
         takerAsset: order.takerAsset,
-        makerAmount: order.makerAmount,
-        takerAmount: order.takerAmount,
+        makerAmount: order.makerAmount, // Keep as BigInt for EIP-712
+        takerAmount: order.takerAmount, // Keep as BigInt for EIP-712
         deadline: order.deadline,
-        salt: order.nonce || 0,
+        salt: salt,
         secretHash: order.secretHash,
-        sourceChain: order.sourceChain || 128123,
-        destinationChain: order.destinationChain || 11155111,
-        predicate: '0x',
-        maxSlippage: 500,
+        sourceChain: sourceChainId,
+        destinationChain: destinationChainId,
+        predicate: '0x', // No predicate for basic orders
+        maxSlippage: 500, // 5% max slippage
         requirePriceValidation: false,
         priceData: {
           price: 0,
@@ -316,33 +347,150 @@ const UserOrderPage = () => {
           signature: '0x'
         }
       };
+      
+      // Debug: Log the exact values being signed
+      console.log('🔍 Value details:', {
+        maker: value.maker,
+        taker: value.taker,
+        makerAsset: value.makerAsset,
+        takerAsset: value.takerAsset,
+        makerAmount: value.makerAmount.toString(),
+        takerAmount: value.takerAmount.toString(),
+        deadline: value.deadline,
+        salt: value.salt,
+        secretHash: value.secretHash,
+        sourceChain: value.sourceChain,
+        destinationChain: value.destinationChain,
+        predicate: value.predicate,
+        maxSlippage: value.maxSlippage,
+        requirePriceValidation: value.requirePriceValidation
+      });
 
-      console.log('🔍 Signing EIP-712 data:', { domain, types, value });
+      // Get the order hash from the contract first
+      const lopContract = new ethers.Contract(verifyingContract, [
+        "function getOrderHash((address,address,address,address,uint256,uint256,uint256,uint256,bytes32,uint256,uint256,bytes,uint256,bool,(uint256,uint256,address,string[],uint256,uint256,bytes))) external view returns (bytes32)"
+      ], wallet.provider);
+      
+      // Pre-hash the priceData to match deployed contract's expectation
+      const priceDataHash = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(
+        ['uint256', 'uint256', 'address', 'string[]', 'uint256', 'uint256', 'bytes'],
+        [
+          value.priceData.price,
+          value.priceData.timestamp,
+          value.priceData.relayer,
+          value.priceData.apiSources,
+          value.priceData.confidence,
+          value.priceData.deviation,
+          value.priceData.signature
+        ]
+      ));
+      
+      const orderStruct = [
+        value.maker,
+        value.taker,
+        value.makerAsset,
+        value.takerAsset,
+        value.makerAmount,
+        value.takerAmount,
+        value.deadline,
+        value.salt,
+        value.secretHash,
+        value.sourceChain,
+        value.destinationChain,
+        ethers.keccak256(value.predicate), // Hash the predicate as contract expects
+        value.maxSlippage,
+        value.requirePriceValidation,
+        priceDataHash  // Use hashed priceData instead of raw struct
+      ];
+      
+      // Update the existing domain to use the correct chainId
+      domain.chainId = sourceChainId;
+      domain.verifyingContract = verifyingContract;
+      
+      // The types are already correctly defined above
+      
+      // Update the existing value object with the correct data
+      value.maker = value.maker;
+      value.taker = value.taker;
+      value.makerAsset = value.makerAsset;
+      value.takerAsset = value.takerAsset;
+      value.makerAmount = value.makerAmount;
+      value.takerAmount = value.takerAmount;
+      value.deadline = value.deadline;
+      value.salt = value.salt;
+      value.secretHash = value.secretHash;
+      value.sourceChain = value.sourceChain;
+      value.destinationChain = value.destinationChain;
+      value.predicate = value.predicate;
+      value.maxSlippage = value.maxSlippage;
+      value.requirePriceValidation = value.requirePriceValidation;
+      value.priceData = {
+        price: value.priceData.price,
+        timestamp: value.priceData.timestamp,
+        relayer: value.priceData.relayer,
+        apiSources: value.priceData.apiSources,
+        confidence: value.priceData.confidence,
+        deviation: value.priceData.deviation,
+        signature: value.priceData.signature
+      };
+      
+      // Use EIP-712 structured data signing (RECOMMENDED approach)
       const signature = await wallet.signTypedData(domain, types, value);
       console.log('🔍 EIP-712 signature created:', signature);
+      console.log('🔍 Salt used for signing:', salt);
       
-      // Submit order to orderbook (convert BigInt to strings for JSON serialization)
+      // Debug: Verify signature locally to ensure it's valid
+      try {
+        const recoveredAddress = ethers.verifyTypedData(domain, types, value, signature);
+        console.log('🔍 Local signature verification:', {
+          recoveredAddress,
+          expectedAddress: value.maker,
+          isValid: recoveredAddress.toLowerCase() === value.maker.toLowerCase()
+        });
+      } catch (error) {
+        console.error('❌ Local signature verification failed:', error);
+      }
+      
+      // Create the order submission that the UI sends to the relayer
       const orderSubmission = {
-        order: {
-          maker: order.maker,
-          makerAsset: order.makerAsset,
-          takerAsset: order.takerAsset,
-          makerAmount: order.makerAmount.toString(), // Convert BigInt to string
-          takerAmount: order.takerAmount.toString(), // Convert BigInt to string
-          deadline: order.deadline,
-          secretHash: order.secretHash,
-          sourceChain: order.sourceChain,
-          destinationChain: order.destinationChain
+        maker: order.maker,
+        makerAsset: order.makerAsset,
+        takerAsset: order.takerAsset,
+        makerAmount: order.makerAmount.toString(),
+        takerAmount: order.takerAmount.toString(),
+        deadline: order.deadline,
+        secretHash: order.secretHash,
+        nonce: salt, // Use nonce instead of salt to match relayer expectation
+        sourceChain: orderParams.fromChain === 'ethereum' ? 11155111 : 128123,
+        destinationChain: orderParams.toChain === 'ethereum' ? 11155111 : 128123,
+        // Additional fields that enhanced-relayer expects
+        predicate: '0x',
+        maxSlippage: 500,
+        requirePriceValidation: false,
+        priceData: {
+          price: 0,
+          timestamp: 0,
+          relayer: '0x0000000000000000000000000000000000000000',
+          apiSources: [],
+          confidence: 0,
+          deviation: 0,
+          signature: '0x'
         },
-        signature
+        fromChain: orderParams.fromChain,
+        toChain: orderParams.toChain
       };
+      
+      console.log('🔍 Order submission being sent:', orderSubmission);
 
       const response = await fetch(`${config.RELAYER_API_URL}/api/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(orderSubmission)
+        body: JSON.stringify({
+          order: orderSubmission,
+          signature: signature
+        })
       });
 
       const result = await response.json();

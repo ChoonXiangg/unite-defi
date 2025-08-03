@@ -111,8 +111,9 @@ const OrderbookPage = () => {
       console.log('Orders set:', data.orders || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
-      console.error('⚠️ Cannot connect to relayer server. Please start the relayer first:');
-      console.error('   cd Relayer && node server.js');
+      console.error('⚠️ Cannot connect to enhanced-relayer. Please ensure it is running:');
+      console.error(`   Expected URL: ${config.RELAYER_API_URL}`);
+      console.error('   Command: cd Relayer && node enhanced-relayer.js');
       setOrders([]); // Show empty orders instead of mock data
     }
   };
@@ -323,11 +324,26 @@ const OrderbookPage = () => {
         throw new Error('Unsupported order source chain. Order must be from Sepolia or Etherlink.');
       }
       
-      // Use the correct ABI that matches the actual contract structure
+      // Correct ABI that matches your deployed LOP contract
       const lopABI = [
-        "function executeOrder((address,address,address,address,uint256,uint256,uint256,uint256,bytes32,uint256,uint256,bytes,uint256,bool,(uint256,uint256,address,string[],uint256,uint256,bytes)), bytes) external returns (address)",
-        "function validateOrderConditions((address,address,address,address,uint256,uint256,uint256,uint256,bytes32,uint256,uint256,bytes,uint256,bool,(uint256,uint256,address,string[],uint256,uint256,bytes))) external view returns (bool)",
-        "function getOrderHash((address,address,address,address,uint256,uint256,uint256,uint256,bytes32,uint256,uint256,bytes,uint256,bool,(uint256,uint256,address,string[],uint256,uint256,bytes))) external view returns (bytes32)"
+        // Main execution function
+        "function executeOrder((address maker,address taker,address makerAsset,address takerAsset,uint256 makerAmount,uint256 takerAmount,uint256 deadline,uint256 salt,bytes32 secretHash,uint256 sourceChain,uint256 destinationChain,bytes predicate,uint256 maxSlippage,bool requirePriceValidation,(uint256 price,uint256 timestamp,address relayer,string[] apiSources,uint256 confidence,uint256 deviation,bytes signature) priceData) order, bytes signature) external returns (address)",
+        // Validation functions
+        "function validateOrderSignature((address maker,address taker,address makerAsset,address takerAsset,uint256 makerAmount,uint256 takerAmount,uint256 deadline,uint256 salt,bytes32 secretHash,uint256 sourceChain,uint256 destinationChain,bytes predicate,uint256 maxSlippage,bool requirePriceValidation,(uint256 price,uint256 timestamp,address relayer,string[] apiSources,uint256 confidence,uint256 deviation,bytes signature) priceData) order, bytes signature) external view returns (bool)",
+        "function validateOrderConditions((address maker,address taker,address makerAsset,address takerAsset,uint256 makerAmount,uint256 takerAmount,uint256 deadline,uint256 salt,bytes32 secretHash,uint256 sourceChain,uint256 destinationChain,bytes predicate,uint256 maxSlippage,bool requirePriceValidation,(uint256 price,uint256 timestamp,address relayer,string[] apiSources,uint256 confidence,uint256 deviation,bytes signature) priceData) order) external view returns (bool)",
+        // Hash functions
+        "function getOrderHash((address maker,address taker,address makerAsset,address takerAsset,uint256 makerAmount,uint256 takerAmount,uint256 deadline,uint256 salt,bytes32 secretHash,uint256 sourceChain,uint256 destinationChain,bytes predicate,uint256 maxSlippage,bool requirePriceValidation,(uint256 price,uint256 timestamp,address relayer,string[] apiSources,uint256 confidence,uint256 deviation,bytes signature) priceData) order) external view returns (bytes32)",
+        // Authorization
+        "function authorizedResolvers(address) external view returns (bool)",
+        "function authorizedPriceRelayers(address) external view returns (bool)",
+        // Configuration
+        "function escrowFactories(uint256) external view returns (address)",
+        "function orderStatus(bytes32) external view returns (uint256)",
+        "function owner() external view returns (address)",
+        "function DOMAIN_SEPARATOR() external view returns (bytes32)",
+        // Events
+        "event OrderExecuted(bytes32 indexed orderHash, address indexed resolver, address indexed escrowContract, uint256 chainId)",
+        "event OrderCancelled(bytes32 indexed orderHash, address indexed maker)"
       ];
       
       const lopContract = new ethers.Contract(
@@ -335,31 +351,141 @@ const OrderbookPage = () => {
         lopABI,
         wallet
       );
+      
+      // Check if the user is authorized as a resolver
+      try {
+        const isAuthorized = await lopContract.authorizedResolvers(account);
+        console.log('🔍 User authorized as resolver:', isAuthorized);
+        if (!isAuthorized) {
+          console.warn('⚠️ User is not authorized as resolver. This might cause issues.');
+        }
+      } catch (error) {
+        console.error('❌ Could not check resolver authorization:', error);
+      }
+      
+      // Check what contract is actually deployed
+      try {
+        const code = await wallet.provider.getCode(contractAddress);
+        console.log('🔍 Contract code length:', code.length);
+        console.log('🔍 Contract has code:', code !== '0x');
+        
+        if (code === '0x') {
+          console.error('❌ No contract deployed at this address!');
+          return;
+        }
+        
+        // Try to identify the contract by checking for common functions
+        const testContract = new ethers.Contract(contractAddress, [
+          'function name() view returns (string)',
+          'function symbol() view returns (string)',
+          'function owner() view returns (address)',
+          'function DOMAIN_SEPARATOR() view returns (bytes32)',
+          'function authorizedResolvers(address) view returns (bool)',
+          'function escrowFactories(uint256) view returns (address)'
+        ], wallet.provider);
+        
+        // Only check essential contract functions
+        try {
+          const owner = await testContract.owner();
+          console.log('🔍 Contract owner:', owner);
+        } catch (e) {
+          console.log('🔍 Contract has no owner() function');
+        }
+        
+        // Check the contract's domain separator (this function exists)
+        try {
+          const domainSeparator = await lopContract.DOMAIN_SEPARATOR();
+          console.log('🔍 Contract domain separator:', domainSeparator);
+        } catch (error) {
+          console.error('❌ Could not get domain separator:', error);
+        }
+      } catch (error) {
+        console.error('❌ Could not check contract code:', error);
+      }
 
       // Transform order to match the actual Order struct from the contract
-      const orderStruct = [
-        order.maker,                                    // maker
-        ethers.ZeroAddress,                            // taker (0x0 for anyone)
-        order.makerAsset,                              // makerAsset
-        order.takerAsset,                              // takerAsset
-        order.makerAmount,                             // makerAmount
-        order.takerAmount,                             // takerAmount
-        order.deadline,                                // deadline
-        order.nonce || 0,                              // salt
-        order.secretHash,                              // secretHash
-        order.sourceChain || 128123,                   // sourceChain
-        order.destinationChain || 11155111,            // destinationChain
-        '0x',                                          // predicate (empty for now)
-        500,                                           // maxSlippage (5% = 500 basis points)
-        false,                                         // requirePriceValidation
-        [0, 0, ethers.ZeroAddress, [], 0, 0, '0x']   // priceData (RelayerPriceData struct)
-      ];
-
-      console.log('🔍 Order struct:', orderStruct);
-      console.log('🔍 Order struct length:', orderStruct.length);
-      console.log('🔍 Order struct types:', orderStruct.map(item => typeof item));
+      // The order data comes from the API, so we need to extract the nested order if it exists
+      const originalOrder = order.order || order;
       
-      const tx = await lopContract.executeOrder(orderStruct, orderData.signature);
+      console.log('🔍 Raw order data from API:', order);
+      console.log('🔍 Extracted order data:', originalOrder);
+      
+      // Debug: Let's see all fields from the original order to understand what we're working with
+      console.log('🔍 All available fields in originalOrder:', Object.keys(originalOrder));
+      console.log('🔍 Original order field values:');
+      Object.keys(originalOrder).forEach(key => {
+        console.log(`   ${key}:`, originalOrder[key]);
+      });
+      
+      // The key insight: UserOrderPage signs with salt but stores as nonce in API
+      // So we need to map nonce back to salt for the contract call
+      const orderStruct = {
+        maker: originalOrder.maker,
+        taker: ethers.ZeroAddress, // This was hardcoded in UserOrderPage as ZeroAddress
+        makerAsset: originalOrder.makerAsset,
+        takerAsset: originalOrder.takerAsset,
+        makerAmount: originalOrder.makerAmount,
+        takerAmount: originalOrder.takerAmount,
+        deadline: originalOrder.deadline,
+        salt: originalOrder.nonce, // The nonce from API is actually the salt used in signing
+        secretHash: originalOrder.secretHash || ethers.keccak256('0x'),
+        sourceChain: originalOrder.sourceChain,
+        destinationChain: originalOrder.destinationChain,
+        predicate: originalOrder.predicate || '0x',
+        maxSlippage: originalOrder.maxSlippage || 500,
+        requirePriceValidation: originalOrder.requirePriceValidation || false,
+        priceData: originalOrder.priceData || {
+          price: 0,
+          timestamp: 0,
+          relayer: ethers.ZeroAddress,
+          apiSources: [],
+          confidence: 0,
+          deviation: 0,
+          signature: '0x'
+        }
+      };
+
+      // Extract signature - it might be in different places depending on API response format
+      const signature = orderData.signature || originalOrder.signature || order.signature;
+      
+      console.log('🔍 Order struct:', orderStruct);
+      console.log('🔍 Signature being used:', signature);
+      console.log('🔍 All signature sources:', {
+        orderDataSignature: orderData.signature,
+        originalOrderSignature: originalOrder.signature,
+        orderSignature: order.signature
+      });
+      console.log('🔍 Contract address:', contractAddress);
+      console.log('🔍 Order source chain:', orderSourceChain);
+      
+      // Skip order hash verification since the simplified contract doesn't have getOrderHash
+      console.log('📋 Proceeding without order hash verification (simplified contract)');
+      
+      // Estimate gas for the executeOrder function
+      let gasEstimate;
+      try {
+        gasEstimate = await lopContract.executeOrder.estimateGas(
+          orderStruct,
+          signature
+        );
+        console.log('🔍 Gas estimate:', gasEstimate.toString());
+      } catch (error) {
+        console.error('❌ Gas estimation failed:', error);
+        console.error('Error details:', error.message);
+        gasEstimate = 500000n; // Fallback gas limit as BigInt
+      }
+
+      // Execute with proper gas limit
+      const gasLimit = BigInt(Math.floor(Number(gasEstimate) * 1.2));
+
+      console.log('🔍 Executing order with struct parameters');
+      const tx = await lopContract.executeOrder(
+        orderStruct,
+        signature,
+        {
+          gasLimit: gasLimit
+        }
+      );
 
       setExecutionStatus('Waiting for transaction confirmation...');
       await tx.wait();
@@ -370,7 +496,23 @@ const OrderbookPage = () => {
       ));
     } catch (error) {
       console.error('Error executing order:', error);
-      setExecutionStatus('Error executing order: ' + error.message);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Error executing order: ';
+      
+      if (error.code === -32603) {
+        errorMessage += 'Network/RPC error. Please try again or check your connection.';
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage += 'Insufficient funds for gas. Please add more ETH to your wallet.';
+      } else if (error.message.includes('nonce')) {
+        errorMessage += 'Transaction nonce error. Please try again.';
+      } else if (error.message.includes('revert')) {
+        errorMessage += 'Transaction reverted. The order may have already been executed or cancelled.';
+      } else {
+        errorMessage += error.message;
+      }
+      
+      setExecutionStatus(errorMessage);
     }
     setLoading(false);
   };

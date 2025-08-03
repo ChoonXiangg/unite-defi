@@ -100,21 +100,27 @@ const ProcessPage = () => {
     }
   };
 
-  // Fetch user orders
+  // Fetch user orders from orderbook and filter by user
   const fetchUserOrders = async () => {
     if (!account) return;
     
     try {
       console.log('Fetching user orders for account:', account);
-      const response = await fetch(`${config.RELAYER_API_URL}/api/orders?user=${account}`);
+      const response = await fetch(`${config.RELAYER_API_URL}/api/orderbook`);
       const data = await response.json();
-      console.log('User orders API response:', data);
-      setUserOrders(data.orders || []);
-      console.log('User orders set:', data.orders || []);
+      console.log('Orderbook API response:', data);
+      
+      // Filter orders by user account (maker)
+      const userOrders = (data.orders || []).filter(order => 
+        order.maker && order.maker.toLowerCase() === account.toLowerCase()
+      );
+      
+      setUserOrders(userOrders);
+      console.log('User orders filtered:', userOrders);
     } catch (error) {
       console.error('Error fetching user orders:', error);
-      console.error('⚠️ Cannot connect to relayer server. Please start the relayer first:');
-      console.error('   cd Relayer && node server.js');
+      console.error('⚠️ Cannot connect to enhanced-relayer. Please start it first:');
+      console.error('   cd Relayer && node enhanced-relayer.js');
       setUserOrders([]); // Show empty orders instead of mock data
     }
   };
@@ -157,7 +163,7 @@ const ProcessPage = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${config.RELAYER_API_URL}/api/provide-secret`, {
+      const response = await fetch(`${config.RELAYER_API_URL}/api/orders/${orderId}/secret`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

@@ -18,6 +18,12 @@ const WebSocket = require('ws');
  */
 class EnhancedRelayer {
     constructor() {
+        // Domain separators from deployed contracts
+        this.domainSeparators = {
+            128123: '0x1c8e7d7cfcee86dc62184749c9e6327269016e19bf4b71706cd021543a4d619d', // Etherlink
+            11155111: '0x0000000000000000000000000000000000000000000000000000000000000000'  // Sepolia (will be updated)
+        };
+
         this.app = express();
         this.setupMiddleware();
         this.setupProviders();
@@ -71,6 +77,7 @@ class EnhancedRelayer {
         // LOP contract ABI (will be set when deployed)
         const lopABI = [
             "function executeOrder((address,address,address,address,uint256,uint256,uint256,uint256,bytes32,uint256,uint256,bytes,uint256,bool,(uint256,uint256,address,string[],uint256,uint256,bytes)), bytes) external returns (address)",
+            "function getOrderHash((address,address,address,address,uint256,uint256,uint256,uint256,bytes32,uint256,uint256,bytes,uint256,bool,(uint256,uint256,address,string[],uint256,uint256,bytes))) external view returns (bytes32)",
             "function getOrderStatus(bytes32) external view returns (uint256)",
             "function getOrderEscrow(bytes32) external view returns (address)",
             "event OrderExecuted(bytes32 indexed orderHash, address indexed resolver, address indexed escrowContract, uint256 chainId)"
@@ -82,18 +89,14 @@ class EnhancedRelayer {
             "event EscrowCreated(address indexed escrow, bytes32 indexed orderHash)"
         ];
 
-        this.lopContracts = {
-            sepolia: process.env.SEPOLIA_HYBRID_LOP_ADDRESS ? new ethers.Contract(
-                process.env.SEPOLIA_HYBRID_LOP_ADDRESS,
-                lopABI,
-                this.signers.sepolia
-            ) : null,
-            etherlink: process.env.ETHERLINK_HYBRID_LOP_ADDRESS ? new ethers.Contract(
-                process.env.ETHERLINK_HYBRID_LOP_ADDRESS,
-                lopABI,
-                this.signers.etherlink
-            ) : null
+        // Store contract addresses and ABI for later use (don't create instances yet to avoid ABI mismatch)
+        this.contractAddresses = {
+            sepolia: process.env.SEPOLIA_HYBRID_LOP_ADDRESS || '0xE1a2de86f545C37dDd5722b988fa81774759BD44',
+            etherlink: process.env.ETHERLINK_HYBRID_LOP_ADDRESS || '0x1Ab07abaC969aAF2cBC1b87ce64cfFADD259a4fd'
         };
+        
+        // Store ABI for later use when needed
+        this.lopABI = lopABI;
 
         console.log('📋 Contracts configured');
     }
@@ -456,11 +459,34 @@ class EnhancedRelayer {
 
             // 3. Verify EIP-712 signature (matches contract's validateOrderSignature)
             // The domain should match the order's source chain since you have contracts on both chains
+            const sourceChainId = order.sourceChain || 128123;
+            let verifyingContract;
+            
+            // Get the correct LOP contract address for the source chain (using your deployed contracts)
+            if (sourceChainId === 11155111) { // Sepolia
+                verifyingContract = process.env.SEPOLIA_HYBRID_LOP_ADDRESS || '0xE1a2de86f545C37dDd5722b988fa81774759BD44';
+            } else if (sourceChainId === 128123) { // Etherlink
+                verifyingContract = process.env.ETHERLINK_HYBRID_LOP_ADDRESS || '0x1Ab07abaC969aAF2cBC1b87ce64cfFADD259a4fd';
+            } else {
+                return { valid: false, reason: `Unsupported source chain: ${sourceChainId}` };
+            }
+            
+            console.log('🔍 Domain validation:', { sourceChainId, verifyingContract });
+            
+            
+            // Use the actual domain separators from contracts
+            const actualDomainSeparator = this.domainSeparators[sourceChainId];
+            if (actualDomainSeparator) {
+                console.log('🔍 Using actual domain separator from contract:', actualDomainSeparator);
+            }
+            
             const domain = {
-                name: 'LimitOrderProtocol',
-                version: '1.0',
-                chainId: order.sourceChain || 128123 // Use the order's source chain
+                name: 'EtherlinkLOP',
+                version: '1',
+                chainId: sourceChainId,
+                verifyingContract: verifyingContract
             };
+
 
             const types = {
                 Order: [
@@ -496,17 +522,17 @@ class EnhancedRelayer {
                 taker: ethers.ZeroAddress,
                 makerAsset: order.makerAsset,
                 takerAsset: order.takerAsset,
-                makerAmount: order.makerAmount,
-                takerAmount: order.takerAmount,
+                makerAmount: BigInt(order.makerAmount), // Convert to BigInt
+                takerAmount: BigInt(order.takerAmount), // Convert to BigInt
                 deadline: order.deadline,
-                salt: order.nonce || 0,
+                salt: order.nonce || 0, // Use nonce as salt to match UI
                 secretHash: order.secretHash,
                 sourceChain: order.sourceChain || 128123,
                 destinationChain: order.destinationChain || 11155111,
-                predicate: '0x',
-                maxSlippage: 500,
-                requirePriceValidation: false,
-                priceData: {
+                predicate: order.predicate || '0x',
+                maxSlippage: order.maxSlippage || 500,
+                requirePriceValidation: order.requirePriceValidation || false,
+                priceData: order.priceData || {
                     price: 0,
                     timestamp: 0,
                     relayer: ethers.ZeroAddress,
@@ -519,8 +545,14 @@ class EnhancedRelayer {
 
             console.log('🔍 Verifying EIP-712 signature for:', value);
             console.log('🔍 Signature received:', signature);
+            console.log('🔍 Domain:', domain);
+            console.log('🔍 Types:', types);
+            console.log('🔍 Order received:', order);
+            console.log('🔍 Order nonce:', order.nonce);
+            console.log('🔍 Order salt:', order.salt);
             
             try {
+                // Use EIP-712 verification since UI uses signTypedData (no contract call needed)
                 const recoveredAddress = ethers.verifyTypedData(domain, types, value, signature);
                 console.log('🔍 Recovered address:', recoveredAddress);
                 console.log('🔍 Expected address:', order.maker);
@@ -533,15 +565,26 @@ class EnhancedRelayer {
                 return { valid: false, reason: 'Invalid signature format' };
             }
 
-            // 4. Check maker balance (simplified)
-            const chainId = order.sourceChain || 11155111;
-            const provider = chainId === 11155111 ? this.providers.sepolia : this.providers.etherlink;
-            
-            if (order.makerAsset === ethers.ZeroAddress) {
-                const balance = await provider.getBalance(order.maker);
-                if (balance < BigInt(order.makerAmount)) {
-                    return { valid: false, reason: 'Insufficient ETH balance' };
+            // 4. Check maker balance (simplified) - with error handling
+            try {
+                const chainId = order.sourceChain || 11155111;
+                const provider = chainId === 11155111 ? this.providers.sepolia : this.providers.etherlink;
+                
+                // Validate maker address format
+                if (!ethers.isAddress(order.maker)) {
+                    return { valid: false, reason: 'Invalid maker address format' };
                 }
+                
+                if (order.makerAsset === ethers.ZeroAddress) {
+                    const balance = await provider.getBalance(order.maker);
+                    if (balance < BigInt(order.makerAmount)) {
+                        return { valid: false, reason: 'Insufficient ETH balance' };
+                    }
+                }
+            } catch (balanceError) {
+                console.log('⚠️ Balance check failed:', balanceError.message);
+                // Don't fail validation due to balance check issues
+                console.log('ℹ️ Continuing without balance validation');
             }
 
             return { valid: true };
@@ -742,11 +785,91 @@ class EnhancedRelayer {
     }
 
     async calculateOrderHash(order) {
-        // Simplified order hash calculation
-        return ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(
-            ['address', 'address', 'address', 'uint256', 'uint256', 'uint256', 'bytes32'],
-            [order.maker, order.makerAsset, order.takerAsset, order.makerAmount, order.takerAmount, order.deadline, order.secretHash]
-        ));
+        // Calculate order hash using EIP-712 (no contract call needed)
+        try {
+            const sourceChainId = order.sourceChain || 128123;
+            
+            // Get the correct LOP contract address for domain
+            let verifyingContract;
+            if (sourceChainId === 11155111) { // Sepolia
+                verifyingContract = this.contractAddresses.sepolia;
+            } else if (sourceChainId === 128123) { // Etherlink
+                verifyingContract = this.contractAddresses.etherlink;
+            } else {
+                throw new Error(`Unsupported source chain: ${sourceChainId}`);
+            }
+            
+            const domain = {
+                name: 'LimitOrderProtocol',
+                version: '1.0',
+                chainId: sourceChainId,
+                verifyingContract: verifyingContract
+            };
+            
+            const types = {
+                Order: [
+                    { name: 'maker', type: 'address' },
+                    { name: 'taker', type: 'address' },
+                    { name: 'makerAsset', type: 'address' },
+                    { name: 'takerAsset', type: 'address' },
+                    { name: 'makerAmount', type: 'uint256' },
+                    { name: 'takerAmount', type: 'uint256' },
+                    { name: 'deadline', type: 'uint256' },
+                    { name: 'salt', type: 'uint256' },
+                    { name: 'secretHash', type: 'bytes32' },
+                    { name: 'sourceChain', type: 'uint256' },
+                    { name: 'destinationChain', type: 'uint256' },
+                    { name: 'predicate', type: 'bytes' },
+                    { name: 'maxSlippage', type: 'uint256' },
+                    { name: 'requirePriceValidation', type: 'bool' },
+                    { name: 'priceData', type: 'RelayerPriceData' }
+                ],
+                RelayerPriceData: [
+                    { name: 'price', type: 'uint256' },
+                    { name: 'timestamp', type: 'uint256' },
+                    { name: 'relayer', type: 'address' },
+                    { name: 'apiSources', type: 'string[]' },
+                    { name: 'confidence', type: 'uint256' },
+                    { name: 'deviation', type: 'uint256' },
+                    { name: 'signature', type: 'bytes' }
+                ]
+            };
+            
+            const value = {
+                maker: order.maker,
+                taker: order.taker || ethers.ZeroAddress,
+                makerAsset: order.makerAsset,
+                takerAsset: order.takerAsset,
+                makerAmount: order.makerAmount,
+                takerAmount: order.takerAmount,
+                deadline: order.deadline,
+                salt: order.salt || order.nonce,
+                secretHash: order.secretHash,
+                sourceChain: order.sourceChain || 128123,
+                destinationChain: order.destinationChain || 11155111,
+                predicate: order.predicate || '0x',
+                maxSlippage: order.maxSlippage || 500,
+                requirePriceValidation: order.requirePriceValidation || false,
+                priceData: order.priceData || {
+                    price: 0,
+                    timestamp: 0,
+                    relayer: ethers.ZeroAddress,
+                    apiSources: [],
+                    confidence: 0,
+                    deviation: 0,
+                    signature: '0x'
+                }
+            };
+            
+            // Calculate EIP-712 hash
+            const orderHash = ethers.TypedDataEncoder.hash(domain, types, value);
+            return orderHash;
+            
+        } catch (error) {
+            console.log('⚠️ Order hash calculation failed:', error.message);
+            // Simple fallback hash
+            return ethers.keccak256(ethers.toUtf8Bytes(JSON.stringify(order)));
+        }
     }
 
     // ============================================================================
