@@ -14,59 +14,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Mock portfolio data - in real app this would come from API
-const mockPortfolioData = [
-  {
-    symbol: "1INCH",
-    name: "1inch Network", 
-    balance: "15000.00",
-    value: 8750.00,
-    price: 0.583,
-    change24h: 12.4,
-    logo: "https://assets.coingecko.com/coins/images/13469/small/1inch-token.png",
-    priceHistory: [0.520, 0.545, 0.560, 0.575, 0.583, 0.590, 0.585, 0.580, 0.583]
-  },
-  {
-    symbol: "PGS",
-    name: "PegaSwap",
-    balance: "2500.00",
-    value: 6750.00,
-    price: 2.70,
-    change24h: 8.5,
-    logo: "/PGS-logo-original.svg",
-    priceHistory: [2.45, 2.52, 2.61, 2.68, 2.70, 2.75, 2.72, 2.69, 2.70]
-  },
-  {
-    symbol: "ETH",
-    name: "Ethereum", 
-    balance: "2.45",
-    value: 6002.50,
-    price: 2450.00,
-    change24h: 5.2,
-    logo: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
-    priceHistory: [2380, 2410, 2390, 2420, 2450, 2480, 2450, 2470, 2450]
-  },
-  {
-    symbol: "USDC",
-    name: "USD Coin",
-    balance: "1500.00", 
-    value: 1500.00,
-    price: 1.00,
-    change24h: 0.1,
-    logo: "https://assets.coingecko.com/coins/images/6319/small/USD_Coin_icon.png",
-    priceHistory: [0.999, 1.000, 0.998, 1.001, 1.000, 0.999, 1.000, 1.001, 1.000]
-  },
-  {
-    symbol: "XTZ",
-    name: "Tezos",
-    balance: "3500.00",
-    value: 4200.00,
-    price: 1.20,
-    change24h: 3.2,
-    logo: "https://assets.coingecko.com/coins/images/976/small/Tezos-logo.png",
-    priceHistory: [1.15, 1.18, 1.16, 1.19, 1.20, 1.22, 1.21, 1.18, 1.20]
-  }
-];
+// PGS token configuration - deployed on Arbitrum
+const PGS_TOKEN_CONFIG = {
+  symbol: "PGS",
+  name: "PegaSwap",
+  address: "0x4a109A21EeD37d5D1AA0e8e2DE9e50005850eC6c", // Deployed PGS contract on Arbitrum
+  chainId: 42161, // Arbitrum One
+  decimals: 18,
+  logo: "/PGS-logo-original.svg"
+};
 
 
 // Helper function to map token symbols to CoinGecko IDs
@@ -121,79 +77,128 @@ export default function Portfolio() {
       if (result.success) {
         setMultiChainData(result.data);
         
-        // Convert to portfolio format for compatibility
-        const allTokens = [];
+        // Convert to portfolio format for compatibility and fetch real prices from 1inch API
+        const tokenPromises = [];
         
         Object.values(result.data.chains).forEach(chain => {
           if (chain.tokens && chain.tokens.length > 0) {
             chain.tokens.forEach(token => {
               if (token.metadata && token.numericBalance > 0) {
-                const tokenInfo = {
-                  symbol: token.metadata.symbol,
-                  name: token.metadata.name,
-                  balance: token.formattedBalance,
-                  value: token.estimatedValueUSD || 0,
-                  price: result.data.tokenLogos[token.metadata.symbol]?.currentPrice || 0,
-                  change24h: result.data.tokenLogos[token.metadata.symbol]?.priceChange24h || 0,
-                  logo: result.data.tokenLogos[token.metadata.symbol]?.logoUrl || token.metadata.logoURI || `https://via.placeholder.com/40x40/666666/ffffff?text=${token.metadata.symbol}`,
-                  chainId: token.chainId,
-                  chainName: token.chainName,
-                  address: token.address,
-                  decimals: token.metadata.decimals,
-                  isRealData: true
-                };
-                allTokens.push(tokenInfo);
+                tokenPromises.push(async () => {
+                  // Clean token symbol and fetch real price from 1inch API with fallbacks
+                  let tokenPrice = 0;
+                  
+                  // Clean the token symbol (remove suffixes like _1, _2, etc.)
+                  const cleanSymbol = token.metadata.symbol.replace(/_\d+$/, '');
+                  const chainId = token.chainId;
+                  
+                  console.log(`🔍 Processing token: ${token.metadata.symbol} -> ${cleanSymbol} on chain ${chainId}`);
+                  
+                  try {
+                    const priceResponse = await fetch(`/api/price/realtime-oneinch?tokenSymbol=${cleanSymbol}&chainId=${chainId}`);
+                    if (priceResponse.ok) {
+                      const priceData = await priceResponse.json();
+                      if (priceData.success && priceData.price > 0) {
+                        tokenPrice = priceData.price;
+                        console.log(`💰 1inch price for ${cleanSymbol} on chain ${chainId}: $${tokenPrice}`);
+                      } else if (priceData.usingFallback && priceData.price > 0) {
+                        tokenPrice = priceData.price;
+                        console.log(`⚠️ 1inch fallback price for ${cleanSymbol}: $${tokenPrice}`);
+                      } else {
+                        throw new Error('No valid price from 1inch API');
+                      }
+                    } else {
+                      throw new Error(`HTTP ${priceResponse.status}`);
+                    }
+                  } catch (error) {
+                    console.error(`❌ Failed to fetch 1inch price for ${cleanSymbol} on chain ${chainId}:`, error.message);
+                    
+                    // Fallback to CoinGecko price if available (try both original and clean symbol)
+                    const coinGeckoPrice = result.data.tokenLogos[token.metadata.symbol]?.currentPrice || 
+                                         result.data.tokenLogos[cleanSymbol]?.currentPrice;
+                    if (coinGeckoPrice && coinGeckoPrice > 0) {
+                      tokenPrice = coinGeckoPrice;
+                      console.log(`🦎 Using CoinGecko fallback price for ${cleanSymbol}: $${tokenPrice}`);
+                    } else {
+                      // No price available from any API - user wants 1inch API only
+                      tokenPrice = 0;
+                      console.warn(`⚠️ No price available for ${cleanSymbol} from 1inch or CoinGecko APIs, using $0`);
+                    }
+                  }
+                  
+                  const balance = parseFloat(token.formattedBalance);
+                  const calculatedValue = balance * tokenPrice;
+                  
+                  const tokenInfo = {
+                    symbol: token.metadata.symbol,
+                    name: token.metadata.name,
+                    balance: token.formattedBalance,
+                    value: calculatedValue,
+                    price: tokenPrice,
+                    change24h: result.data.tokenLogos[token.metadata.symbol]?.priceChange24h || 0,
+                    logo: result.data.tokenLogos[token.metadata.symbol]?.logoUrl || token.metadata.logoURI || `https://via.placeholder.com/40x40/666666/ffffff?text=${token.metadata.symbol}`,
+                    chainId: token.chainId,
+                    chainName: token.chainName,
+                    address: token.address,
+                    decimals: token.metadata.decimals,
+                    isRealData: true
+                  };
+                  
+                  console.log(`📊 Token ${cleanSymbol} (${token.metadata.symbol}): ${balance} tokens × $${tokenPrice} = $${calculatedValue.toFixed(2)}`);
+                  return tokenInfo;
+                });
               }
             });
           }
         });
-
-        // Add mock holdings for PGS, 1INCH, and Tezos if not found in real data
-        const foundSymbols = new Set(allTokens.map(token => token.symbol.toUpperCase()));
         
-        const mockTokensToAdd = [
-          {
-            symbol: "PGS",
-            name: "PegaSwap",
-            balance: "2500.00",
-            value: 6750.00,
-            price: 2.70,
-            change24h: 8.5,
-            logo: "/PGS-logo-original.svg",
-            chainName: "Mock",
-            isRealData: false
-          },
-          {
-            symbol: "1INCH",
-            name: "1inch Network", 
-            balance: "15000.00",
-            value: 8750.00,
-            price: 0.583,
-            change24h: 12.4,
-            logo: "https://assets.coingecko.com/coins/images/13469/small/1inch-token.png",
-            chainName: "Mock",
-            isRealData: false
-          },
-          {
-            symbol: "XTZ",
-            name: "Tezos",
-            balance: "3500.00",
-            value: 4200.00,
-            price: 1.20,
-            change24h: 3.2,
-            logo: "https://assets.coingecko.com/coins/images/976/small/Tezos-logo.png",
-            chainName: "Mock",
-            isRealData: false
+        // Execute all price fetches with rate limiting
+        const allTokens = [];
+        for (let i = 0; i < tokenPromises.length; i++) {
+          const tokenInfo = await tokenPromises[i]();
+          allTokens.push(tokenInfo);
+          
+          // Rate limit: wait 100ms between requests to respect API limits
+          if (i < tokenPromises.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
           }
-        ];
+        }
 
-        // Add mock tokens if they weren't found in real wallet data
-        mockTokensToAdd.forEach(mockToken => {
-          if (!foundSymbols.has(mockToken.symbol)) {
-            allTokens.push(mockToken);
-            console.log(`📝 Added mock holding for ${mockToken.symbol}: ${mockToken.balance} (${mockToken.value} USD)`);
+        // Fetch PGS token balance separately (deployed on Arbitrum)
+        try {
+          const pgsResponse = await fetch(`/api/wallet/tokens?walletAddress=${address}&chainId=${PGS_TOKEN_CONFIG.chainId}&tokenAddress=${PGS_TOKEN_CONFIG.address}`);
+          if (pgsResponse.ok) {
+            const pgsData = await pgsResponse.json();
+            if (pgsData.success && pgsData.balance && parseFloat(pgsData.balance.formatted) > 0) {
+              // Get PGS price from 1inch API
+              const pgsPrice = await fetch(`/api/price/realtime-oneinch?tokenSymbol=PGS`);
+              const pgsPriceData = pgsPrice.ok ? await pgsPrice.json() : null;
+              
+              const pgsBalance = parseFloat(pgsData.balance.formatted);
+              const pgsCurrentPrice = pgsPriceData?.price || 0; // Use 0 if 1inch API fails (no hardcoded fallbacks)
+              
+              const pgsToken = {
+                symbol: PGS_TOKEN_CONFIG.symbol,
+                name: PGS_TOKEN_CONFIG.name,
+                balance: pgsBalance.toFixed(2),
+                value: pgsBalance * pgsCurrentPrice,
+                price: pgsCurrentPrice,
+                change24h: 0, // PGS doesn't have historical data yet
+                logo: PGS_TOKEN_CONFIG.logo,
+                chainId: PGS_TOKEN_CONFIG.chainId,
+                chainName: "Arbitrum One",
+                address: PGS_TOKEN_CONFIG.address,
+                decimals: PGS_TOKEN_CONFIG.decimals,
+                isRealData: true
+              };
+              
+              allTokens.push(pgsToken);
+              console.log(`✅ Added real PGS balance: ${pgsBalance.toFixed(2)} PGS ($${(pgsBalance * pgsCurrentPrice).toFixed(2)})`);
+            }
           }
-        });
+        } catch (pgsError) {
+          console.error('❌ Failed to fetch PGS balance:', pgsError);
+        }
         
         // Sort by balance value and set as portfolio
         const sortedTokens = allTokens.sort((a, b) => b.value - a.value);
@@ -201,6 +206,16 @@ export default function Portfolio() {
         
         if (sortedTokens.length > 0) {
           setSelectedToken(sortedTokens[0]);
+        }
+        
+        // Update localStorage with real PGS balance for NFT page
+        const pgsToken = allTokens.find(token => token.symbol === 'PGS');
+        if (pgsToken) {
+          localStorage.setItem('pgsBalance', pgsToken.balance);
+          console.log(`💾 Updated localStorage PGS balance: ${pgsToken.balance}`);
+        } else {
+          localStorage.setItem('pgsBalance', '0');
+          console.log(`💾 No PGS tokens found, set localStorage balance to 0`);
         }
         
         console.log(`✅ Portfolio loaded: ${allTokens.length} tokens across ${result.data.summary.networksWithBalance} networks`);
@@ -212,10 +227,9 @@ export default function Portfolio() {
       console.error('❌ Failed to load multi-chain portfolio:', error);
       setPortfolioError(error.message);
       
-      // Fallback to mock data
-      const sortedPortfolio = [...mockPortfolioData].sort((a, b) => b.value - a.value);
-      setPortfolio(sortedPortfolio);
-      setSelectedToken(sortedPortfolio[0]);
+      // Set empty portfolio on error - user should connect wallet for real data
+      setPortfolio([]);
+      setSelectedToken(null);
     } finally {
       setPortfolioLoading(false);
     }
@@ -235,23 +249,18 @@ export default function Portfolio() {
           
         } catch (error) {
           console.log('Wallet auto-connection failed:', error);
-          // Fallback to mock data
-          const sortedPortfolio = [...mockPortfolioData].sort((a, b) => b.value - a.value);
-          setPortfolio(sortedPortfolio);
-          setSelectedToken(sortedPortfolio[0]);
+          // Set empty portfolio - user needs to connect wallet for real data
+          setPortfolio([]);
+          setSelectedToken(null);
         }
       } else {
-        // No wallet connected, use mock data
-        const sortedPortfolio = [...mockPortfolioData].sort((a, b) => b.value - a.value);
-        setPortfolio(sortedPortfolio);
-        setSelectedToken(sortedPortfolio[0]);
+        // No wallet connected, show empty portfolio
+        setPortfolio([]);
+        setSelectedToken(null);
       }
       
-      // Store PGS balance in localStorage for nft.js to access
-      const pgsToken = mockPortfolioData.find(token => token.symbol === 'PGS');
-      if (pgsToken) {
-        localStorage.setItem('pgsBalance', pgsToken.balance);
-      }
+      // Store PGS balance in localStorage for nft.js to access - will be updated when portfolio loads
+      localStorage.setItem('pgsBalance', '0');
     };
     
     checkWalletConnection();
@@ -353,7 +362,20 @@ export default function Portfolio() {
                 </div>
               </div>
               <div>
-                {portfolio.map((token) => (
+                {portfolio.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <div className="text-gray-400 mb-4">
+                      <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">No Portfolio Data</h3>
+                    <p className="text-gray-400 text-sm">
+                      Connect your wallet to view your real token holdings and balances across multiple chains.
+                    </p>
+                  </div>
+                ) : (
+                  portfolio.map((token) => (
                   <button
                     key={token.symbol}
                     onClick={() => setSelectedToken(token)}
@@ -410,7 +432,8 @@ export default function Portfolio() {
                       </div>
                     </div>
                   </button>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -454,7 +477,7 @@ export default function Portfolio() {
                       )}
                       {isLive && (
                         <div className="text-xs text-green-400">
-                          ● Live price from CoinGecko
+                          ● Live price from 1inch API
                         </div>
                       )}
                     </div>
@@ -462,7 +485,7 @@ export default function Portfolio() {
                   
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <div className="text-sm text-gray-400">Real-Time Price (CoinGecko)</div>
+                      <div className="text-sm text-gray-400">Real-Time Price (1inch API)</div>
                       <div className="text-xl font-bold text-white">
                         {priceLoading ? (
                           <div className="animate-pulse bg-gray-700 h-6 w-20 rounded"></div>
@@ -472,7 +495,7 @@ export default function Portfolio() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-400">Balance (Mock)</div>
+                      <div className="text-sm text-gray-400">Balance {selectedToken.isRealData ? '(Real Wallet)' : '(No Balance)'}</div>
                       <div className="text-xl font-bold text-white">
                         {parseFloat(selectedToken.balance).toLocaleString()} {selectedToken.symbol}
                       </div>
@@ -500,9 +523,9 @@ export default function Portfolio() {
                     }`}></div>
                     <span>
                       {isLive 
-                        ? 'Live price updates via CoinGecko API' 
+                        ? 'Live price updates via 1inch API' 
                         : usingFallback 
-                          ? 'Using fallback prices' 
+                          ? 'Using fallback prices (1inch/CoinGecko)' 
                           : 'Price service unavailable'
                       }
                     </span>

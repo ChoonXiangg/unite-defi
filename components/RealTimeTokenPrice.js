@@ -35,10 +35,11 @@ const RealTimeTokenPrice = ({
   const [error, setError] = useState(null);
   const intervalRef = useRef(null);
 
-  // Fetch real-time price from CoinGecko
+  // Fetch real-time price from 1inch API first, then CoinGecko as fallback
   const fetchRealTimePrice = async () => {
     try {
-      const response = await fetch(`/api/price/realtime-coingecko?coinId=${coinGeckoId}`);
+      // Try 1inch API first for real-time prices
+      const response = await fetch(`/api/price/realtime-oneinch?tokenSymbol=${tokenName}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -53,25 +54,47 @@ const RealTimeTokenPrice = ({
       } else if (data.usingFallback) {
         setCurrentPrice(data.price);
         setLastUpdated(new Date(data.timestamp));
-        setError(data.fallbackMessage || 'Using fallback price from CoinGecko');
+        setError(data.fallbackMessage || 'Using fallback price from 1inch');
       } else {
         throw new Error(data.error || 'Unknown API error');
       }
     } catch (err) {
-      console.error('Error fetching real-time price:', err);
+      console.error('Error fetching real-time price from 1inch:', err);
+      
+      // Fallback to CoinGecko if 1inch fails
+      try {
+        const response = await fetch(`/api/price/realtime-coingecko?coinId=${coinGeckoId}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success || data.usingFallback) {
+            setCurrentPrice(data.price);
+            setLastUpdated(new Date(data.timestamp));
+            setError('1inch API failed - using CoinGecko fallback');
+            return;
+          }
+        }
+      } catch (coinGeckoErr) {
+        console.error('CoinGecko fallback also failed:', coinGeckoErr);
+      }
+      
+      // Use local fallback prices if both APIs fail
       setError('Network error - using fallback price');
       
-      // Set fallback price based on token
       const fallbackPrices = {
-        'ethereum': 2450,
-        'bitcoin': 45000,
-        'usd-coin': 1,
-        'tether': 1,
-        'matic-network': 0.8,
-        'binancecoin': 320,
-        'avalanche-2': 25
+        'ETH': 2450,
+        'BTC': 45000,
+        'USDC': 1,
+        'USDT': 1,
+        'MATIC': 0.8,
+        'BNB': 320,
+        'AVAX': 25,
+        '1INCH': 0.583,
+        'XTZ': 1.2,
+        'PGS': 2.70
       };
-      setCurrentPrice(fallbackPrices[coinGeckoId] || 100);
+      setCurrentPrice(fallbackPrices[tokenName.toUpperCase()] || 100);
+      setLastUpdated(new Date());
     }
   };
 
@@ -255,10 +278,10 @@ const RealTimeTokenPrice = ({
 
       {/* Footer */}
       <div className="flex items-center justify-between text-xs text-gray-400">
-        <span>24-hour price history</span>
+        <span>24-hour price history (CoinGecko)</span>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span>Live updates every 5s</span>
+          <span>Live prices via 1inch API (5s updates)</span>
         </div>
       </div>
     </div>
