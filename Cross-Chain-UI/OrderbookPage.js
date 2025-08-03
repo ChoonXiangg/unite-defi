@@ -104,7 +104,7 @@ const OrderbookPage = () => {
   const fetchOrders = async () => {
     try {
       console.log('Fetching orders...');
-      const response = await fetch(`${config.RELAYER_API_URL}/api/orders`);
+      const response = await fetch(`${config.RELAYER_API_URL}/api/orderbook`);
       const data = await response.json();
       console.log('Orders API response:', data);
       setOrders(data.orders || []);
@@ -190,17 +190,34 @@ const OrderbookPage = () => {
         return parseFloat(amountStr);
       };
       
-      const fromAmount = safeParseAmount(order.fromAmount);
-      const toAmount = safeParseAmount(order.toAmount);
+      // Map the correct field names with fallbacks
+      const fromAmount = safeParseAmount(order.makerAmount || order.fromAmount);
+      const toAmount = safeParseAmount(order.takerAmount || order.toAmount);
+      const fromChain = order.sourceChain || order.fromChain;
+      const toChain = order.destinationChain || order.toChain;
       
       // Simple profitability check based on order ratio
       const orderRate = fromAmount > 0 ? toAmount / fromAmount : 0;
       
+      // Map chain IDs to chain names for rate calculation
+      let fromChainName = fromChain;
+      let toChainName = toChain;
+      if (fromChain === 11155111 || fromChain === '11155111') {
+        fromChainName = 'ethereum';
+      } else if (fromChain === 128123 || fromChain === '128123') {
+        fromChainName = 'etherlink';
+      }
+      if (toChain === 11155111 || toChain === '11155111') {
+        toChainName = 'ethereum';
+      } else if (toChain === 128123 || toChain === '128123') {
+        toChainName = 'etherlink';
+      }
+      
       // Expected rates (approximate)
       let expectedRate = 1.0;
-      if (order.fromChain === 'ethereum' && order.toChain === 'etherlink') {
+      if (fromChainName === 'ethereum' && toChainName === 'etherlink') {
         expectedRate = 4700; // ETH to XTZ
-      } else if (order.fromChain === 'etherlink' && order.toChain === 'ethereum') {
+      } else if (fromChainName === 'etherlink' && toChainName === 'ethereum') {
         expectedRate = 0.000212; // XTZ to ETH
       }
       
@@ -229,14 +246,14 @@ const OrderbookPage = () => {
   // Async version for detailed analysis when executing orders
   const analyzeProfitabilityDetailed = async (order) => {
     try {
-      const fromAmountStr = typeof order.fromAmount === 'string' ? order.fromAmount : order.fromAmount.toString();
-      const toAmountStr = typeof order.toAmount === 'string' ? order.toAmount : order.toAmount.toString();
+      const fromAmountStr = typeof order.makerAmount === 'string' ? order.makerAmount : order.makerAmount.toString();
+      const toAmountStr = typeof order.takerAmount === 'string' ? order.takerAmount : order.takerAmount.toString();
       
       const fromAmount = parseFloat(ethers.formatEther(fromAmountStr));
       const toAmount = parseFloat(ethers.formatEther(toAmountStr));
       
       // Get real-time market price
-      const currentPrice = await getRealTimePrice(order.fromChain, order.toChain);
+      const currentPrice = await getRealTimePrice(order.sourceChain, order.destinationChain);
       const expectedValue = fromAmount * currentPrice;
       const profit = toAmount - expectedValue;
       const profitPercentage = expectedValue > 0 ? (profit / expectedValue) * 100 : 0;
@@ -255,7 +272,7 @@ const OrderbookPage = () => {
   };
 
   // Execute order
-  const executeOrder = async (order) => {
+  const executeOrder = async (orderData) => {
     if (!wallet) {
       alert('Please connect your wallet first');
       return;
@@ -263,10 +280,15 @@ const OrderbookPage = () => {
 
     setLoading(true);
     try {
+      // Handle both old and new order formats
+      const order = orderData.order || orderData;
       setExecutionStatus('Validating order signature...');
       const isValid = await validateOrderSignature(order);
       if (!isValid) {
-        throw new Error('Invalid order signature');
+        const signatureChainId = order.sourceChain || 128123;
+        const network = await wallet.provider.getNetwork();
+        const currentChainId = Number(network.chainId);
+        throw new Error(`Please switch to the correct network. Order signature was created for chain ${signatureChainId} but you're connected to ${currentChainId}`);
       }
 
       setExecutionStatus('Checking predicate conditions...');
@@ -277,47 +299,74 @@ const OrderbookPage = () => {
 
       setExecutionStatus('Triggering LimitOrderProtocol...');
       
-      // Get current network to handle ENS resolution properly
+      // Use the order's source chain to determine which contract to use
+      // This ensures we use the correct contract for the chain where the order was created
+      const orderSourceChain = order.sourceChain || 128123;
+      
+      // Check if user is connected to the correct network for this order
       const network = await wallet.provider.getNetwork();
       const currentChainId = Number(network.chainId);
       
-      // Use different contract addresses based on network
+      if (currentChainId !== orderSourceChain) {
+        throw new Error(`Please switch to the correct network. Order requires chain ${orderSourceChain} but you're connected to ${currentChainId}`);
+      }
+      
+      // Use different contract addresses based on the order's source chain
       let contractAddress;
-      if (currentChainId === 128123) {
+      if (orderSourceChain === 128123) {
         // Etherlink - use your deployed LOP contract
         contractAddress = config.CONTRACTS.ETHERLINK_LOP;
-      } else if (currentChainId === 11155111) {
+      } else if (orderSourceChain === 11155111) {
         // Sepolia - use your deployed LOP contract
         contractAddress = config.CONTRACTS.SEPOLIA_LOP;
       } else {
-        throw new Error('Unsupported network. Please switch to Sepolia or Etherlink.');
+        throw new Error('Unsupported order source chain. Order must be from Sepolia or Etherlink.');
       }
+      
+      // Use the correct ABI that matches the actual contract structure
+      const lopABI = [
+        "function executeOrder((address,address,address,address,uint256,uint256,uint256,uint256,bytes32,uint256,uint256,bytes,uint256,bool,(uint256,uint256,address,string[],uint256,uint256,bytes)), bytes) external returns (address)",
+        "function validateOrderConditions((address,address,address,address,uint256,uint256,uint256,uint256,bytes32,uint256,uint256,bytes,uint256,bool,(uint256,uint256,address,string[],uint256,uint256,bytes))) external view returns (bool)",
+        "function getOrderHash((address,address,address,address,uint256,uint256,uint256,uint256,bytes32,uint256,uint256,bytes,uint256,bool,(uint256,uint256,address,string[],uint256,uint256,bytes))) external view returns (bytes32)"
+      ];
       
       const lopContract = new ethers.Contract(
         contractAddress,
-        ['function executeOrder(address maker, address fromToken, address toToken, uint256 fromAmount, uint256 toAmount, string fromChain, string toChain, uint256 nonce, uint256 deadline, bytes signature)'],
+        lopABI,
         wallet
       );
 
-      const tx = await lopContract.executeOrder(
-        order.maker,
-        order.fromToken,
-        order.toToken,
-        order.fromAmount,
-        order.toAmount,
-        order.fromChain,
-        order.toChain,
-        order.nonce,
-        order.deadline,
-        order.signature
-      );
+      // Transform order to match the actual Order struct from the contract
+      const orderStruct = [
+        order.maker,                                    // maker
+        ethers.ZeroAddress,                            // taker (0x0 for anyone)
+        order.makerAsset,                              // makerAsset
+        order.takerAsset,                              // takerAsset
+        order.makerAmount,                             // makerAmount
+        order.takerAmount,                             // takerAmount
+        order.deadline,                                // deadline
+        order.nonce || 0,                              // salt
+        order.secretHash,                              // secretHash
+        order.sourceChain || 128123,                   // sourceChain
+        order.destinationChain || 11155111,            // destinationChain
+        '0x',                                          // predicate (empty for now)
+        500,                                           // maxSlippage (5% = 500 basis points)
+        false,                                         // requirePriceValidation
+        [0, 0, ethers.ZeroAddress, [], 0, 0, '0x']   // priceData (RelayerPriceData struct)
+      ];
+
+      console.log('🔍 Order struct:', orderStruct);
+      console.log('🔍 Order struct length:', orderStruct.length);
+      console.log('🔍 Order struct types:', orderStruct.map(item => typeof item));
+      
+      const tx = await lopContract.executeOrder(orderStruct, orderData.signature);
 
       setExecutionStatus('Waiting for transaction confirmation...');
       await tx.wait();
       setExecutionStatus('Order executed successfully! Transaction: ' + tx.hash);
       
       setOrders(prev => prev.map(o => 
-        o.id === order.id ? { ...o, status: 'executed', txHash: tx.hash } : o
+        o.id === orderData.id ? { ...o, status: 'executed', txHash: tx.hash } : o
       ));
     } catch (error) {
       console.error('Error executing order:', error);
@@ -328,8 +377,26 @@ const OrderbookPage = () => {
 
   // Validate order signature
   const validateOrderSignature = async (order) => {
-    // Mock signature validation
-    return true;
+    try {
+      // Get the network where the signature was created
+      const signatureChainId = order.sourceChain || 128123;
+      
+      // Get current network
+      const network = await wallet.provider.getNetwork();
+      const currentChainId = Number(network.chainId);
+      
+      // Check if we're on the correct network for this signature
+      if (currentChainId !== signatureChainId) {
+        console.error(`❌ Network mismatch: Signature created for chain ${signatureChainId}, but connected to ${currentChainId}`);
+        return false;
+      }
+      
+      console.log(`✅ Network validation passed: Connected to chain ${currentChainId}, signature created for chain ${signatureChainId}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Signature validation error:', error);
+      return false;
+    }
   };
 
   // Check predicate conditions
@@ -340,7 +407,15 @@ const OrderbookPage = () => {
 
   // Get token symbol by address
   const getTokenSymbol = (address, chain) => {
-    const tokens = tokenOptions[chain] || [];
+    // Map chain IDs to chain names
+    let chainName = chain;
+    if (chain === 11155111 || chain === '11155111') {
+      chainName = 'ethereum';
+    } else if (chain === 128123 || chain === '128123') {
+      chainName = 'etherlink';
+    }
+    
+    const tokens = tokenOptions[chainName] || [];
     const token = tokens.find(t => t.address.toLowerCase() === address.toLowerCase());
     return token ? `${token.logo} ${token.symbol}` : 'Unknown';
   };
@@ -411,10 +486,31 @@ const OrderbookPage = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {orders.map((order) => {
-                  const profitability = analyzeProfitability(order);
-                  const fromTokenSymbol = getTokenSymbol(order.fromToken, order.fromChain);
-                  const toTokenSymbol = getTokenSymbol(order.toToken, order.toChain);
+                {orders.map((orderData) => {
+                  // Handle both old and new order formats
+                  const order = orderData.order || orderData;
+                  
+                  // Map the correct field names
+                  const fromToken = order.makerAsset || order.fromToken;
+                  const toToken = order.takerAsset || order.toToken;
+                  const fromAmount = order.makerAmount || order.fromAmount;
+                  const toAmount = order.takerAmount || order.toAmount;
+                  
+                  // Get chain information from the order
+                  const fromChain = order.sourceChain || order.fromChain || 128123; // Default to Etherlink
+                  const toChain = order.destinationChain || order.toChain || 11155111; // Default to Sepolia
+                  
+                  // Create enhanced order object with chain information for profitability analysis
+                  const enhancedOrder = {
+                    ...order,
+                    sourceChain: fromChain,
+                    destinationChain: toChain
+                  };
+                  
+                  const profitability = analyzeProfitability(enhancedOrder);
+                  
+                  const fromTokenSymbol = getTokenSymbol(fromToken, fromChain);
+                  const toTokenSymbol = getTokenSymbol(toToken, toChain);
                   
                   // Safe formatting with improved wei detection
                   const safeFormatAmount = (amount) => {
@@ -438,36 +534,36 @@ const OrderbookPage = () => {
                     return parseFloat(amountStr).toFixed(6);
                   };
                   
-                  const fromAmount = safeFormatAmount(order.fromAmount);
-                  const toAmount = safeFormatAmount(order.toAmount);
+                  const formattedFromAmount = safeFormatAmount(fromAmount);
+                  const formattedToAmount = safeFormatAmount(toAmount);
                   
                   return (
-                    <tr key={order.id} className="hover:bg-gray-50">
+                    <tr key={orderData.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">#{order.id}</div>
+                        <div className="text-sm font-medium text-gray-900">#{orderData.id}</div>
                         <div className="text-sm text-gray-500">
-                          {new Date(order.createdAt).toLocaleString()}
+                          {new Date(orderData.createdAt).toLocaleString()}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {fromTokenSymbol} ({order.fromChain})
+                          {fromTokenSymbol} ({fromChain})
                         </div>
                         <div className="text-sm text-gray-500">
-                          {fromAmount} {fromTokenSymbol}
+                          {formattedFromAmount} {fromTokenSymbol}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {toTokenSymbol} ({order.toChain})
+                          {toTokenSymbol} ({toChain})
                         </div>
                         <div className="text-sm text-gray-500">
-                          {toAmount} {toTokenSymbol}
+                          {formattedToAmount} {toTokenSymbol}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {fromAmount} → {toAmount}
+                          {formattedFromAmount} {fromTokenSymbol} → {formattedToAmount} {toTokenSymbol}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -480,25 +576,29 @@ const OrderbookPage = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          order.status === 'executed' ? 'bg-green-100 text-green-800' :
+                          orderData.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          orderData.status === 'picked' ? 'bg-blue-100 text-blue-800' :
+                          orderData.status === 'executed' ? 'bg-green-100 text-green-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
-                          {order.status}
+                          {orderData.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {order.status === 'pending' && (
+                        {(orderData.status === 'pending' || orderData.status === 'picked') && (
                           <button
-                            onClick={() => executeOrder(order)}
+                            onClick={() => executeOrder(orderData)}
                             disabled={loading || !wallet}
                             className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-3 py-1 rounded text-sm transition-colors duration-200"
                           >
                             {loading ? 'Executing...' : 'Execute'}
                           </button>
                         )}
-                        {order.status === 'executed' && (
+                        {orderData.status === 'executed' && (
                           <span className="text-green-600">✓ Executed</span>
+                        )}
+                        {orderData.status === 'picked' && (
+                          <span className="text-blue-600 text-xs">Picked by resolver</span>
                         )}
                       </td>
                     </tr>

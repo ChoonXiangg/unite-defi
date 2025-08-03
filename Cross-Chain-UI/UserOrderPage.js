@@ -232,49 +232,17 @@ const UserOrderPage = () => {
 
     setLoading(true);
     try {
-      // Create EIP-712 order structure
+      // Create order structure that matches relayer expectations
       const order = {
         maker: account,
-        fromToken: orderParams.fromToken,
-        toToken: orderParams.toToken,
-        fromAmount: ethers.parseEther(orderParams.fromAmount),
-        toAmount: ethers.parseEther(quote.toTokenAmount.toString()),
-        fromChain: orderParams.fromChain,
-        toChain: orderParams.toChain,
-        nonce: Date.now(),
-        deadline: Math.floor(Date.now() / 1000) + 3600 // 1 hour
-      };
-
-      // Get the current network chainId from the wallet
-      const network = await wallet.provider.getNetwork();
-      const currentChainId = Number(network.chainId);
-      
-      // Sign the order using the current network's chainId
-      const domain = {
-        name: 'Unite DeFi',
-        version: '1',
-        chainId: currentChainId, // Use the current network's chainId
-        verifyingContract: '0x1234567890123456789012345678901234567890' // Mock LOP contract address
-      };
-
-      // For Etherlink, we need to ensure no ENS resolution is attempted
-      if (currentChainId === 128123) {
-        // Use a simple address format that won't trigger ENS resolution
-        domain.verifyingContract = '0x1234567890123456789012345678901234567890';
-      }
-
-      const types = {
-        Order: [
-          { name: 'maker', type: 'address' },
-          { name: 'fromToken', type: 'address' },
-          { name: 'toToken', type: 'address' },
-          { name: 'fromAmount', type: 'uint256' },
-          { name: 'toAmount', type: 'uint256' },
-          { name: 'fromChain', type: 'string' },
-          { name: 'toChain', type: 'string' },
-          { name: 'nonce', type: 'uint256' },
-          { name: 'deadline', type: 'uint256' }
-        ]
+        makerAsset: orderParams.fromToken,
+        takerAsset: orderParams.toToken,
+        makerAmount: ethers.parseEther(orderParams.fromAmount),
+        takerAmount: ethers.parseEther(quote.toTokenAmount.toString()),
+        deadline: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+        secretHash: ethers.keccak256(ethers.toUtf8Bytes("secret" + Date.now())),
+        sourceChain: orderParams.fromChain === 'ethereum' ? 11155111 : 128123,
+        destinationChain: orderParams.toChain === 'ethereum' ? 11155111 : 128123
       };
 
       // Ensure wallet has provider for ENS resolution
@@ -282,36 +250,91 @@ const UserOrderPage = () => {
         throw new Error('Wallet provider not available for signing');
       }
       
-      let signature;
-      if (currentChainId === 128123) {
-        // For Etherlink, use a simpler approach to avoid ENS resolution
-        // Convert BigInt values to strings for JSON serialization
-        const orderForSigning = {
-          ...order,
-          fromAmount: order.fromAmount.toString(),
-          toAmount: order.toAmount.toString()
-        };
-        const message = JSON.stringify(orderForSigning);
-        signature = await wallet.signMessage(message);
-      } else {
-        // For Ethereum, use EIP-712
-        signature = await wallet.signTypedData(domain, types, order);
-      }
+      // Use EIP-712 typed data signing to match contract's validateOrderSignature
+      // The domain should match where the LOP contract is deployed
+      const network = await wallet.provider.getNetwork();
+      
+      // Use the user's current network chainId for the domain
+      // This works because you have LOP contracts deployed on both chains
+      const domain = {
+        name: 'LimitOrderProtocol',
+        version: '1.0',
+        chainId: Number(network.chainId) // Use the user's current network
+      };
+
+      const types = {
+        Order: [
+          { name: 'maker', type: 'address' },
+          { name: 'taker', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
+          { name: 'makerAmount', type: 'uint256' },
+          { name: 'takerAmount', type: 'uint256' },
+          { name: 'deadline', type: 'uint256' },
+          { name: 'salt', type: 'uint256' },
+          { name: 'secretHash', type: 'bytes32' },
+          { name: 'sourceChain', type: 'uint256' },
+          { name: 'destinationChain', type: 'uint256' },
+          { name: 'predicate', type: 'bytes' },
+          { name: 'maxSlippage', type: 'uint256' },
+          { name: 'requirePriceValidation', type: 'bool' },
+          { name: 'priceData', type: 'RelayerPriceData' }
+        ],
+        RelayerPriceData: [
+          { name: 'price', type: 'uint256' },
+          { name: 'timestamp', type: 'uint256' },
+          { name: 'relayer', type: 'address' },
+          { name: 'apiSources', type: 'string[]' },
+          { name: 'confidence', type: 'uint256' },
+          { name: 'deviation', type: 'uint256' },
+          { name: 'signature', type: 'bytes' }
+        ]
+      };
+
+      const value = {
+        maker: order.maker,
+        taker: ethers.ZeroAddress,
+        makerAsset: order.makerAsset,
+        takerAsset: order.takerAsset,
+        makerAmount: order.makerAmount,
+        takerAmount: order.takerAmount,
+        deadline: order.deadline,
+        salt: order.nonce || 0,
+        secretHash: order.secretHash,
+        sourceChain: order.sourceChain || 128123,
+        destinationChain: order.destinationChain || 11155111,
+        predicate: '0x',
+        maxSlippage: 500,
+        requirePriceValidation: false,
+        priceData: {
+          price: 0,
+          timestamp: 0,
+          relayer: ethers.ZeroAddress,
+          apiSources: [],
+          confidence: 0,
+          deviation: 0,
+          signature: '0x'
+        }
+      };
+
+      console.log('🔍 Signing EIP-712 data:', { domain, types, value });
+      const signature = await wallet.signTypedData(domain, types, value);
+      console.log('🔍 EIP-712 signature created:', signature);
       
       // Submit order to orderbook (convert BigInt to strings for JSON serialization)
       const orderSubmission = {
-        maker: order.maker,
-        fromToken: order.fromToken,
-        toToken: order.toToken,
-        fromAmount: order.fromAmount.toString(), // Convert BigInt to string
-        toAmount: order.toAmount.toString(), // Convert BigInt to string
-        fromChain: order.fromChain,
-        toChain: order.toChain,
-        nonce: order.nonce,
-        deadline: order.deadline,
-        signature,
-        status: 'pending',
-        createdAt: new Date().toISOString()
+        order: {
+          maker: order.maker,
+          makerAsset: order.makerAsset,
+          takerAsset: order.takerAsset,
+          makerAmount: order.makerAmount.toString(), // Convert BigInt to string
+          takerAmount: order.takerAmount.toString(), // Convert BigInt to string
+          deadline: order.deadline,
+          secretHash: order.secretHash,
+          sourceChain: order.sourceChain,
+          destinationChain: order.destinationChain
+        },
+        signature
       };
 
       const response = await fetch(`${config.RELAYER_API_URL}/api/orders`, {

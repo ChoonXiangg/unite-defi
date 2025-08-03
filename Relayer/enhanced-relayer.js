@@ -163,6 +163,8 @@ class EnhancedRelayer {
                 const { order, signature } = req.body;
                 
                 console.log('📝 New order received for validation');
+                console.log('🔍 Received order:', JSON.stringify(order, null, 2));
+                console.log('🔍 Received signature:', signature);
                 
                 // Validate order structure and parameters
                 const validation = await this.validateOrder(order, signature);
@@ -452,12 +454,83 @@ class EnhancedRelayer {
                 return { valid: false, reason: 'Order deadline has passed' };
             }
 
-            // 3. Verify signature (simplified - implement proper EIP-712)
-            const orderHash = await this.calculateOrderHash(order);
-            const recoveredAddress = ethers.verifyMessage(ethers.getBytes(orderHash), signature);
+            // 3. Verify EIP-712 signature (matches contract's validateOrderSignature)
+            // The domain should match the order's source chain since you have contracts on both chains
+            const domain = {
+                name: 'LimitOrderProtocol',
+                version: '1.0',
+                chainId: order.sourceChain || 128123 // Use the order's source chain
+            };
+
+            const types = {
+                Order: [
+                    { name: 'maker', type: 'address' },
+                    { name: 'taker', type: 'address' },
+                    { name: 'makerAsset', type: 'address' },
+                    { name: 'takerAsset', type: 'address' },
+                    { name: 'makerAmount', type: 'uint256' },
+                    { name: 'takerAmount', type: 'uint256' },
+                    { name: 'deadline', type: 'uint256' },
+                    { name: 'salt', type: 'uint256' },
+                    { name: 'secretHash', type: 'bytes32' },
+                    { name: 'sourceChain', type: 'uint256' },
+                    { name: 'destinationChain', type: 'uint256' },
+                    { name: 'predicate', type: 'bytes' },
+                    { name: 'maxSlippage', type: 'uint256' },
+                    { name: 'requirePriceValidation', type: 'bool' },
+                    { name: 'priceData', type: 'RelayerPriceData' }
+                ],
+                RelayerPriceData: [
+                    { name: 'price', type: 'uint256' },
+                    { name: 'timestamp', type: 'uint256' },
+                    { name: 'relayer', type: 'address' },
+                    { name: 'apiSources', type: 'string[]' },
+                    { name: 'confidence', type: 'uint256' },
+                    { name: 'deviation', type: 'uint256' },
+                    { name: 'signature', type: 'bytes' }
+                ]
+            };
+
+            const value = {
+                maker: order.maker,
+                taker: ethers.ZeroAddress,
+                makerAsset: order.makerAsset,
+                takerAsset: order.takerAsset,
+                makerAmount: order.makerAmount,
+                takerAmount: order.takerAmount,
+                deadline: order.deadline,
+                salt: order.nonce || 0,
+                secretHash: order.secretHash,
+                sourceChain: order.sourceChain || 128123,
+                destinationChain: order.destinationChain || 11155111,
+                predicate: '0x',
+                maxSlippage: 500,
+                requirePriceValidation: false,
+                priceData: {
+                    price: 0,
+                    timestamp: 0,
+                    relayer: ethers.ZeroAddress,
+                    apiSources: [],
+                    confidence: 0,
+                    deviation: 0,
+                    signature: '0x'
+                }
+            };
+
+            console.log('🔍 Verifying EIP-712 signature for:', value);
+            console.log('🔍 Signature received:', signature);
             
-            if (recoveredAddress.toLowerCase() !== order.maker.toLowerCase()) {
-                return { valid: false, reason: 'Invalid signature' };
+            try {
+                const recoveredAddress = ethers.verifyTypedData(domain, types, value, signature);
+                console.log('🔍 Recovered address:', recoveredAddress);
+                console.log('🔍 Expected address:', order.maker);
+                
+                if (recoveredAddress.toLowerCase() !== order.maker.toLowerCase()) {
+                    return { valid: false, reason: 'Invalid signature' };
+                }
+            } catch (error) {
+                console.log('🔍 Signature verification failed:', error.message);
+                return { valid: false, reason: 'Invalid signature format' };
             }
 
             // 4. Check maker balance (simplified)
@@ -486,8 +559,14 @@ class EnhancedRelayer {
         console.log('👀 Starting blockchain monitoring for escrow locks...');
         
         // Monitor both chains for escrow creation events
-        this.monitorChain('sepolia');
-        this.monitorChain('etherlink');
+        // Wrap in try-catch to prevent server crash
+        try {
+            this.monitorChain('sepolia');
+            this.monitorChain('etherlink');
+        } catch (error) {
+            console.log('⚠️  Blockchain monitoring failed, but server continues running');
+            console.log('ℹ️  Manual monitoring will be required');
+        }
     }
 
     async monitorChain(chainName) {
@@ -499,53 +578,105 @@ class EnhancedRelayer {
             return;
         }
 
-        // Listen for EscrowCreated events
-        const escrowFactoryABI = [
-            "event EscrowCreated(address indexed escrow, bytes32 indexed orderHash)"
-        ];
-        
-        const escrowFactory = new ethers.Contract(
-            escrowFactoryAddress,
-            escrowFactoryABI,
-            provider
-        );
-
-        escrowFactory.on('EscrowCreated', async (escrowAddress, orderHash, event) => {
-            console.log(`🏭 Escrow created on ${chainName}:`, escrowAddress, orderHash);
+        try {
+            // Use polling instead of event listeners for RPC providers that don't support eth_newFilter
+            console.log(`📡 Starting polling-based monitoring for ${chainName}`);
             
-            // Store escrow data
-            this.lockedEscrows.set(orderHash, {
-                address: escrowAddress,
-                chain: chainName,
-                status: 'locked',
-                createdAt: Date.now(),
-                blockNumber: event.blockNumber,
-                transactionHash: event.transactionHash
-            });
+            // Store last checked block for each chain
+            if (!this.lastCheckedBlock) {
+                this.lastCheckedBlock = {};
+            }
+            
+            // Get current block number
+            const currentBlock = await provider.getBlockNumber();
+            this.lastCheckedBlock[chainName] = currentBlock;
+            
+            // Start polling every 15 seconds
+            setInterval(async () => {
+                try {
+                    await this.pollForEscrowEvents(chainName, provider, escrowFactoryAddress);
+                } catch (error) {
+                    console.log(`⚠️  Polling error for ${chainName}: ${error.message}`);
+                }
+            }, 15000);
+            
+            console.log(`📡 Polling-based monitoring started for ${chainName} (every 15s)`);
+        } catch (error) {
+            console.log(`⚠️  Blockchain monitoring failed for ${chainName}: ${error.message}`);
+            console.log(`ℹ️  Will retry monitoring later`);
+        }
+    }
 
-            // Update order status in orderbook
-            for (const [orderId, orderData] of this.orderbook.entries()) {
-                if (orderData.hash === orderHash) {
-                    orderData.status = 'executed';
-                    orderData.escrowAddress = escrowAddress;
-                    orderData.executedAt = Date.now();
-                    
-                    // Notify user that funds are locked and secret is needed
-                    this.broadcastToUsers({
-                        type: 'escrow_locked',
-                        orderId,
-                        orderHash,
-                        escrowAddress,
-                        chain: chainName,
-                        message: 'Funds locked in escrow. Please provide your secret to complete the swap.'
-                    });
-                    
-                    break;
+    async pollForEscrowEvents(chainName, provider, escrowFactoryAddress) {
+        try {
+            const currentBlock = await provider.getBlockNumber();
+            const fromBlock = this.lastCheckedBlock[chainName] || currentBlock - 10;
+            
+            if (fromBlock >= currentBlock) {
+                return; // No new blocks
+            }
+            
+            // EscrowFactory ABI for EscrowCreated event
+            const escrowFactoryABI = [
+                "event EscrowCreated(address indexed escrow, bytes32 indexed orderHash)"
+            ];
+            
+            const escrowFactory = new ethers.Contract(
+                escrowFactoryAddress,
+                escrowFactoryABI,
+                provider
+            );
+            
+            // Get events from the last checked block to current
+            const events = await escrowFactory.queryFilter(
+                escrowFactory.filters.EscrowCreated(),
+                fromBlock,
+                currentBlock
+            );
+            
+            for (const event of events) {
+                const [escrowAddress, orderHash] = event.args;
+                console.log(`🏭 Escrow created on ${chainName}:`, escrowAddress, orderHash);
+                
+                // Store escrow data
+                this.lockedEscrows.set(orderHash, {
+                    address: escrowAddress,
+                    chain: chainName,
+                    status: 'locked',
+                    createdAt: Date.now(),
+                    blockNumber: event.blockNumber,
+                    transactionHash: event.transactionHash
+                });
+
+                // Update order status in orderbook
+                for (const [orderId, orderData] of this.orderbook.entries()) {
+                    if (orderData.hash === orderHash) {
+                        orderData.status = 'executed';
+                        orderData.escrowAddress = escrowAddress;
+                        orderData.executedAt = Date.now();
+                        
+                        // Notify user that funds are locked and secret is needed
+                        this.broadcastToUsers({
+                            type: 'escrow_locked',
+                            orderId,
+                            orderHash,
+                            escrowAddress,
+                            chain: chainName,
+                            message: 'Funds locked in escrow. Please provide your secret to complete the swap.'
+                        });
+                        
+                        break;
+                    }
                 }
             }
-        });
-
-        console.log(`📡 Monitoring ${chainName} for escrow events`);
+            
+            // Update last checked block
+            this.lastCheckedBlock[chainName] = currentBlock;
+            
+        } catch (error) {
+            console.log(`⚠️  Polling error for ${chainName}: ${error.message}`);
+            // Don't throw - just log and continue polling
+        }
     }
 
     // ============================================================================

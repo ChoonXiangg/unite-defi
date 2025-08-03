@@ -204,8 +204,26 @@ class Resolver {
                 return true; // Allow for now if LOP not deployed
             }
 
+            // Transform order to match contract struct format
+            const orderStruct = [
+                order.maker,
+                order.makerAsset,
+                order.takerAsset,
+                order.makerAmount,
+                order.takerAmount,
+                order.deadline,
+                order.secretHash,
+                order.nonce || 0,
+                order.sourceChain || 11155111,
+                order.destChain || 128123,
+                '0x', // predicateData - empty for now
+                order.sourceChain || 11155111,
+                false, // gasAdjustment
+                [0, 0, ethers.ZeroAddress, [], 0, 0, '0x'] // predicateParams - default values
+            ];
+
             // Call validateOrderConditions on the LOP contract
-            const isValid = await lopContract.validateOrderConditions(order);
+            const isValid = await lopContract.validateOrderConditions(orderStruct);
             console.log(`🔍 On-chain validation result: ${isValid}`);
             
             return isValid;
@@ -230,12 +248,30 @@ class Resolver {
 
             console.log(`⚡ Executing on ${chainName} chain...`);
 
+            // Transform order to match contract struct format
+            const orderStruct = [
+                order.maker,
+                order.makerAsset,
+                order.takerAsset,
+                order.makerAmount,
+                order.takerAmount,
+                order.deadline,
+                order.secretHash,
+                order.nonce || 0,
+                order.sourceChain || 11155111,
+                order.destChain || 128123,
+                '0x', // predicateData - empty for now
+                order.sourceChain || 11155111,
+                false, // gasAdjustment
+                [0, 0, ethers.ZeroAddress, [], 0, 0, '0x'] // predicateParams - default values
+            ];
+
             // Estimate gas
-            const gasEstimate = await lopContract.executeOrder.estimateGas(order, signature);
+            const gasEstimate = await lopContract.executeOrder.estimateGas(orderStruct, signature);
             console.log(`⛽ Estimated gas: ${gasEstimate.toString()}`);
 
             // Execute the order
-            const tx = await lopContract.executeOrder(order, signature, {
+            const tx = await lopContract.executeOrder(orderStruct, signature, {
                 gasLimit: gasEstimate * 120n / 100n // Add 20% buffer
             });
 
