@@ -130,13 +130,14 @@ export default function Portfolio() {
                   const calculatedValue = balance * tokenPrice;
                   
                   const tokenInfo = {
-                    symbol: token.metadata.symbol,
+                    symbol: cleanSymbol, // Use cleaned symbol for display (USDC instead of USDC_1)
+                    originalSymbol: token.metadata.symbol, // Keep original for reference
                     name: token.metadata.name,
                     balance: token.formattedBalance,
                     value: calculatedValue,
                     price: tokenPrice,
                     change24h: result.data.tokenLogos[token.metadata.symbol]?.priceChange24h || 0,
-                    logo: result.data.tokenLogos[token.metadata.symbol]?.logoUrl || token.metadata.logoURI || `https://via.placeholder.com/40x40/666666/ffffff?text=${token.metadata.symbol}`,
+                    logo: result.data.tokenLogos[token.metadata.symbol]?.logoUrl || token.metadata.logoURI || `https://via.placeholder.com/40x40/666666/ffffff?text=${cleanSymbol}`,
                     chainId: token.chainId,
                     chainName: token.chainName,
                     address: token.address,
